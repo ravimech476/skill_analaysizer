@@ -1,0 +1,42 @@
+# SITE_ADDRESS is your domain (e.g. placements.college.edu) for automatic HTTPS,
+# or ":80" to serve plain HTTP (local testing, or behind another TLS proxy).
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	# The API (uploads are capped at 12 MB by the API itself as well).
+	handle /api/* {
+		request_body {
+			max_size 12MB
+		}
+		reverse_proxy api:8080
+	}
+	handle /health {
+		reverse_proxy api:8080
+	}
+
+	# The single-page app: unknown paths fall back to index.html for client-side routing.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@html path / /index.html
+		header @html Cache-Control "no-cache"
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# antd injects its CSS at runtime, hence 'unsafe-inline' for styles only.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

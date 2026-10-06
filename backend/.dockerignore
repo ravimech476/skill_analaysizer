@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+bin/
+tmp/
+storage/
+storage_test/
+scripts/__pycache__/
+*.exe

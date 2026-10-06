@@ -1,0 +1,32 @@
+name: skills_analyzer
+description: Skills Analyzer — the college placement and skills app for students, parents and staff.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP with interceptors: the access token is attached and silently refreshed there.
+  dio: ^5.7.0
+  # Tokens live in the keychain / Android keystore, never in plain preferences.
+  flutter_secure_storage: ^9.2.2
+  provider: ^6.1.2
+  intl: ^0.19.0
+  # Uploads: a photo from the gallery/camera, or any document.
+  image_picker: ^1.1.2
+  file_picker: ^8.1.2
+  # Opens a signed file link, a course page or a company website in the browser.
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

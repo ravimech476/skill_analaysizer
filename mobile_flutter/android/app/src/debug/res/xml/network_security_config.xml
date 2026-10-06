@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only. This file replaces the strict one in src/main/res/xml because a
+  development laptop's address changes with the network — a phone hotspot, office
+  Wi-Fi and the emulator all hand out something different, so no fixed host list can
+  cover it. Release builds keep src/main's list and still require HTTPS everywhere
+  except the local development addresses.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true"/>
+</network-security-config>

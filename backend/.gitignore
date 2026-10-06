@@ -1,0 +1,6 @@
+.env
+/bin/
+*.exe
+tmp/
+storage/
+storage_test/

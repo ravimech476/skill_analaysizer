@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Skills Analyzer">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f46e5" />
+      <stop offset="0.5" stop-color="#6366f1" />
+      <stop offset="1" stop-color="#0ea5e9" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#g)" />
+  <!-- radar rings + plotted skill point -->
+  <g fill="none" stroke="#fff" stroke-linejoin="round">
+    <path d="M32 13 50 26 43 47H21L14 26z" stroke-opacity="0.55" stroke-width="3" />
+    <path d="M32 24 41 30.5 37.6 41h-11.2L23 30.5z" stroke-opacity="0.9" stroke-width="3" />
+  </g>
+  <circle cx="32" cy="13" r="4.5" fill="#fff" />
+</svg>
