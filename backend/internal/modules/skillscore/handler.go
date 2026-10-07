@@ -32,6 +32,9 @@ func Register(r *gin.RouterGroup, db *pgxpool.Pool, perms *rbac.Cache, students 
 	r.GET("/config/scoring", can("config.view"), h.getScoring)
 	r.PUT("/config/scoring", can("config.update"), h.setScoring)
 
+	r.GET("/config/threshold", can("config.view"), h.getThreshold)
+	r.PUT("/config/threshold", can("config.update"), h.setThreshold)
+
 	r.GET("/students/:id/skill-scores", can("student_skill.view"), h.studentScores)
 	// Anyone who may record a skill may also refresh the scores built from it.
 	r.POST("/skill-scores/recompute", can("skill_analyzer.create", "student_skill.update"), h.recompute)
@@ -118,6 +121,94 @@ func save(ctx context.Context, q dbutil.DBTX, key string, v map[string]float64, 
 		return response.NotFound("Setting " + key + " does not exist")
 	}
 	return nil
+}
+
+// getThreshold returns the global mark threshold and per-skill overrides.
+func (h *Handler) getThreshold(c *gin.Context) {
+	raw, err := configValue(c, h.db, ConfigThreshold)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	matchRaw, err := configValue(c, h.db, ConfigMatch)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	var threshold struct {
+		Default        int                `json:"default"`
+		SkillOverrides map[string]float64 `json:"skill_overrides"`
+	}
+	if err := json.Unmarshal(raw, &threshold); err != nil {
+		threshold.Default = 75
+		threshold.SkillOverrides = map[string]float64{}
+	}
+	if threshold.SkillOverrides == nil {
+		threshold.SkillOverrides = map[string]float64{}
+	}
+	var match map[string]float64
+	if err := json.Unmarshal(matchRaw, &match); err != nil {
+		match = map[string]float64{"skill": 70, "academic": 30}
+	}
+	response.OK(c, gin.H{
+		"global_threshold": threshold.Default,
+		"skill_overrides":  threshold.SkillOverrides,
+		"match_weights":    match,
+	})
+}
+
+// setThreshold saves the global mark threshold, per-skill overrides, and match weights.
+func (h *Handler) setThreshold(c *gin.Context) {
+	var body struct {
+		GlobalThreshold int                `json:"global_threshold"`
+		SkillOverrides  map[string]float64 `json:"skill_overrides"`
+		MatchWeights    map[string]float64 `json:"match_weights"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, response.BadRequest("Invalid request body", err.Error()))
+		return
+	}
+	if body.GlobalThreshold < 0 || body.GlobalThreshold > 100 {
+		response.Error(c, response.BadRequest("global_threshold must be between 0 and 100"))
+		return
+	}
+	for name, val := range body.SkillOverrides {
+		if val < 0 || val > 100 {
+			response.Error(c, response.BadRequest(name+" override must be between 0 and 100"))
+			return
+		}
+	}
+	a := actor.From(c)
+	err := pgx.BeginFunc(c, h.db, func(tx pgx.Tx) error {
+		thresholdVal := map[string]any{
+			"default":         body.GlobalThreshold,
+			"skill_overrides": body.SkillOverrides,
+		}
+		if body.SkillOverrides == nil {
+			thresholdVal["skill_overrides"] = map[string]float64{}
+		}
+		raw, err := json.Marshal(thresholdVal)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(c, `INSERT INTO app_config (key, value, updated_by) VALUES ($1, $2, $3)
+			ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = now(), updated_by = $3`,
+			ConfigThreshold, raw, a.ID); err != nil {
+			return err
+		}
+		if body.MatchWeights != nil {
+			if err := validWeights(body.MatchWeights, []string{"skill", "academic"}); err != nil {
+				return err
+			}
+			return save(c, tx, ConfigMatch, body.MatchWeights, a.ID)
+		}
+		return nil
+	})
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	h.getThreshold(c)
 }
 
 // rebuildAll recomputes scores away from the request, so a weight change or a bulk

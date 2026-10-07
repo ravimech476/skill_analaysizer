@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   AutoComplete,
@@ -13,12 +13,14 @@ import {
   Input,
   InputNumber,
   Modal,
+  Rate,
   Row,
   Select,
   Space,
   Spin,
   Switch,
   Table,
+  Tabs,
   Tag,
   Typography,
   message,
@@ -27,9 +29,10 @@ import { DownloadOutlined, MinusCircleOutlined, PlusOutlined } from '@ant-design
 import { exportsApi } from '../api/reports';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { errorMessage } from '../api/client';
+import { api, errorMessage } from '../api/client';
 import { studentsApi, type ParentInput, type Student, type StudentInput } from '../api/phase2';
 import { useClasses, useDepartments } from '../api/lookups';
+import { placementApi } from '../api/placement';
 import { useAuth } from '../auth/AuthContext';
 import { audienceOf } from '../auth/access';
 import { MarkHistoryView } from './MarksPage';
@@ -38,6 +41,7 @@ import { StudentSkillsEditor } from './SkillsPage';
 import { filesApi } from '../api/files';
 import { FileSlot, UploadButton, UserAvatar } from '../components/Files';
 import StudentDocuments from '../components/StudentDocuments';
+import { StudentsUpload as StudentsUploadTab, SkillsUpload as SkillsUploadTab } from './BulkUploadPage';
 
 const RELATIONS = [
   { value: 'father', label: 'Father' },
@@ -49,7 +53,7 @@ const mobileRule = { pattern: /^[6-9]\d{9}$/, message: 'Valid 10-digit mobile' }
 
 // ---------- create / edit ----------
 
-type FormValues = Omit<StudentInput, 'dob'> & { dob?: dayjs.Dayjs | null };
+type FormValues = Omit<StudentInput, 'dob'> & { dob?: dayjs.Dayjs | null; skills?: { name: string; proficiency: number }[] };
 
 function StudentForm({ row, open, onClose }: { row: Student | null; open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
@@ -58,16 +62,36 @@ function StudentForm({ row, open, onClose }: { row: Student | null; open: boolea
   const { data: depts } = useDepartments();
   const deptId = Form.useWatch('department_id', form);
   const { data: classes } = useClasses(deptId);
+  const { data: skillOptions } = useQuery({
+    queryKey: ['lookup', 'skills'],
+    queryFn: async () => {
+      const r = await api.get('/skills', { params: { all: true } });
+      return r.data.data as Array<{ id: number; name: string; category: string }>;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const { data: studentSkills } = useQuery({
+    queryKey: ['student-skills', row?.id],
+    queryFn: () => placementApi.studentSkills(row!.id),
+    enabled: !!row?.id,
+  });
+
+  useEffect(() => {
+    if (studentSkills && open) {
+      form.setFieldValue('skills', studentSkills.map((s: any) => ({ name: s.name, proficiency: s.proficiency })));
+    }
+  }, [studentSkills, open]);
 
   const save = useMutation({
     mutationFn: (v: FormValues) => {
-      const body: StudentInput = { ...v, dob: v.dob ? v.dob.format('YYYY-MM-DD') : null, class_id: v.class_id ?? null };
+      const body: StudentInput = { ...v, dob: v.dob ? v.dob.format('YYYY-MM-DD') : null, class_id: v.class_id ?? null, skills: v.skills };
       return row ? studentsApi.update(row.id, body) : studentsApi.create(body);
     },
     onSuccess: () => {
       message.success(row ? 'Student updated' : 'Student added');
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['classes'] });
+      qc.invalidateQueries({ queryKey: ['student-skills'] });
       onClose();
     },
     onError: (e) => setError(errorMessage(e)),
@@ -219,6 +243,35 @@ function StudentForm({ row, open, onClose }: { row: Student | null; open: boolea
             </Form.List>
           </>
         )}
+
+        <Typography.Title level={5}>Skills</Typography.Title>
+        <Form.Item label="Skills">
+          <Form.List name="skills">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map(({ key, name, ...restField }) => (
+                  <Space key={key} align="start" style={{ display: 'flex', marginBottom: 8 }}>
+                    <Form.Item {...restField} name={[name, 'name']} rules={[{ required: true, message: 'Skill name' }]} style={{ marginBottom: 0 }}>
+                      <AutoComplete
+                        style={{ width: 200 }}
+                        placeholder="Type or pick skill"
+                        options={(skillOptions ?? []).map((s) => ({ value: s.name, label: s.name }))}
+                        filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
+                      />
+                    </Form.Item>
+                    <Form.Item {...restField} name={[name, 'proficiency']} rules={[{ required: true, message: 'Level' }]} style={{ marginBottom: 0 }}>
+                      <Rate count={5} />
+                    </Form.Item>
+                    <MinusCircleOutlined onClick={() => remove(name)} />
+                  </Space>
+                ))}
+                <Button type="dashed" onClick={() => add({ proficiency: 3 })} icon={<PlusOutlined />} style={{ width: '100%' }}>
+                  Add Skill
+                </Button>
+              </>
+            )}
+          </Form.List>
+        </Form.Item>
       </Form>
     </Drawer>
   );
@@ -511,58 +564,56 @@ function StudentDirectory() {
   const { data, isFetching } = useQuery({ queryKey: ['students', filter], queryFn: () => studentsApi.list(filter), placeholderData: keepPreviousData });
 
   return (
-    <Card
-      title={<span style={{ fontWeight: 600 }}>{data?.meta.total ?? 0} students</span>}
-      extra={
-        can('student.create') && (
+    <>
+      <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+        <Space wrap>
+          <Input.Search allowClear placeholder="Name, register no, mobile" style={{ width: 260 }} onSearch={(search) => setFilter((f) => ({ ...f, search, page: 1 }))} />
+          <Select
+            allowClear
+            placeholder="All departments"
+            style={{ width: 220 }}
+            options={(depts ?? []).map((d) => ({ value: d.id, label: `${d.code} · ${d.name}` }))}
+            onChange={(department_id) => setFilter((f) => ({ ...f, department_id, class_id: undefined, page: 1 }))}
+          />
+          <Select
+            allowClear
+            placeholder="All classes"
+            style={{ width: 180 }}
+            value={filter.class_id}
+            options={(classes ?? []).map((c) => ({ value: c.id, label: c.label }))}
+            onChange={(class_id) => setFilter((f) => ({ ...f, class_id, page: 1 }))}
+          />
+          <Select
+            style={{ width: 150 }}
+            value={filter.lifecycle ?? 'all'}
+            options={[{ value: 'studying', label: 'Studying' }, { value: 'passed_out', label: 'Alumni' }, { value: 'discontinued', label: 'Discontinued' }, { value: 'all', label: 'All students' }]}
+            onChange={(v) => setFilter((f) => ({ ...f, lifecycle: v === 'all' ? undefined : v, page: 1 }))}
+          />
+          {can('student.delete') && (
+            <Select
+              style={{ width: 130 }}
+              defaultValue="active"
+              options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }, { value: 'all', label: 'All' }]}
+              onChange={(status) => setFilter((f) => ({ ...f, status, page: 1 }))}
+            />
+          )}
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={() => {
+              const { page: _p, page_size: _s, ...rest } = filter;
+              void _p;
+              void _s;
+              exportsApi.students(rest);
+            }}
+          >
+            Export (.xlsx)
+          </Button>
+        </Space>
+        {can('student.create') && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setForm({ open: true, row: null })}>
             New student
           </Button>
-        )
-      }
-    >
-      <Space wrap style={{ marginBottom: 16 }}>
-        <Input.Search allowClear placeholder="Name, register no, mobile" style={{ width: 260 }} onSearch={(search) => setFilter((f) => ({ ...f, search, page: 1 }))} />
-        <Select
-          allowClear
-          placeholder="All departments"
-          style={{ width: 220 }}
-          options={(depts ?? []).map((d) => ({ value: d.id, label: `${d.code} · ${d.name}` }))}
-          onChange={(department_id) => setFilter((f) => ({ ...f, department_id, class_id: undefined, page: 1 }))}
-        />
-        <Select
-          allowClear
-          placeholder="All classes"
-          style={{ width: 180 }}
-          value={filter.class_id}
-          options={(classes ?? []).map((c) => ({ value: c.id, label: c.label }))}
-          onChange={(class_id) => setFilter((f) => ({ ...f, class_id, page: 1 }))}
-        />
-        <Select
-          style={{ width: 150 }}
-          value={filter.lifecycle ?? 'all'}
-          options={[{ value: 'studying', label: 'Studying' }, { value: 'passed_out', label: 'Alumni' }, { value: 'discontinued', label: 'Discontinued' }, { value: 'all', label: 'All students' }]}
-          onChange={(v) => setFilter((f) => ({ ...f, lifecycle: v === 'all' ? undefined : v, page: 1 }))}
-        />
-        {can('student.delete') && (
-          <Select
-            style={{ width: 130 }}
-            defaultValue="active"
-            options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }, { value: 'all', label: 'All' }]}
-            onChange={(status) => setFilter((f) => ({ ...f, status, page: 1 }))}
-          />
         )}
-        <Button
-          icon={<DownloadOutlined />}
-          onClick={() => {
-            const { page: _p, page_size: _s, ...rest } = filter;
-            void _p;
-            void _s;
-            exportsApi.students(rest);
-          }}
-        >
-          Export (.xlsx)
-        </Button>
       </Space>
       <Table<Student>
         rowKey="id"
@@ -591,7 +642,7 @@ function StudentDirectory() {
       <Drawer title="Student profile" open={viewing !== null} onClose={() => setViewing(null)} size={Math.min(760, window.innerWidth)} destroyOnHidden>
         {viewing !== null && <StudentProfile id={viewing} onEdit={(s) => setForm({ open: true, row: s })} />}
       </Drawer>
-    </Card>
+    </>
   );
 }
 
@@ -627,10 +678,31 @@ function MyChildren() {
   );
 }
 
+function StudentsAdmin() {
+  const { can } = useAuth();
+  return (
+    <Card>
+      <Tabs
+        items={[
+          { key: 'list', label: 'Student List', children: <StudentDirectory /> },
+          ...(can('bulk_upload.create') ? [{ key: 'import', label: 'Import', children: (
+            <Space direction="vertical" size="large" style={{ width: '100%' }}>
+              <Typography.Title level={5} style={{ marginTop: 0 }}>Import Students</Typography.Title>
+              <StudentsUploadTab />
+              <Typography.Title level={5}>Import Student Skills</Typography.Title>
+              <SkillsUploadTab />
+            </Space>
+          ) }] : []),
+        ]}
+      />
+    </Card>
+  );
+}
+
 export default function StudentsPage() {
   const { user } = useAuth();
   const audience = audienceOf(user?.roles ?? []);
   if (audience === 'student') return <MyProfile />;
   if (audience === 'parent') return <MyChildren />;
-  return <StudentDirectory />;
+  return <StudentsAdmin />;
 }

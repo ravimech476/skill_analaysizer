@@ -27,6 +27,9 @@ const MODULE_HUE: Record<string, ModuleHue> = {
   // Academics
   classes: 'blue',
   marks: 'violet',
+  subjects: 'green',
+  examtypes: 'amber',
+  academicyears: 'rose',
   documents: 'amber',
   yearend: 'rose',
   // People
@@ -36,11 +39,15 @@ const MODULE_HUE: Record<string, ModuleHue> = {
   roles: 'amber',
   // Placement
   skills: 'amber',
+  skillmaster: 'rose',
   careers: 'violet',
-  placement: 'green',
-  analyzer: 'blue',
+  companies: 'green',
+  drives: 'teal',
+  history: 'violet',
+  studentanalysis: 'violet',
+  classanalysis: 'blue',
+  deptanalysis: 'green',
   // Setup & tools
-  academic: 'green',
   bulk: 'teal',
   notifications: 'rose',
 };

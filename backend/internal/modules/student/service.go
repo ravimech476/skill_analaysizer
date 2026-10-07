@@ -29,6 +29,11 @@ type ParentInput struct {
 	IsPrimary bool    `json:"is_primary"`
 }
 
+type SkillInput struct {
+	Name        string `json:"name" binding:"required,max=100"`
+	Proficiency int    `json:"proficiency" binding:"required,min=1,max=5"`
+}
+
 type Input struct {
 	Name          string        `json:"name" binding:"required,max=150"`
 	Username      string        `json:"username"` // defaults to the register number
@@ -45,6 +50,7 @@ type Input struct {
 	BloodGroup    *string       `json:"blood_group" binding:"omitempty,max=5"`
 	Address       *string       `json:"address"`
 	Parents       []ParentInput `json:"parents"` // create only; use the parent endpoints afterwards
+	Skills        []SkillInput  `json:"skills"`  // optional, added/updated on create and update
 }
 
 type ParentRef struct {
@@ -55,6 +61,12 @@ type ParentRef struct {
 	Email     *string `json:"email"`
 	Relation  string  `json:"relation"`
 	IsPrimary bool    `json:"is_primary"`
+}
+
+type SkillRef struct {
+	SkillID     int64  `json:"skill_id"`
+	Name        string `json:"name"`
+	Proficiency int    `json:"proficiency"`
 }
 
 type Student struct {
@@ -88,6 +100,7 @@ type Student struct {
 	Photo          *files.Link `json:"photo"`
 	Resume         *files.Link `json:"resume"`
 	Parents        []ParentRef `json:"parents,omitempty"`
+	Skills         []SkillRef  `json:"skills,omitempty"`
 }
 
 type Filter struct {
@@ -238,6 +251,10 @@ func (s *Service) Get(ctx context.Context, a actor.Actor, id int64) (*Student, e
 		return nil, err
 	}
 	st.Parents, err = s.parents(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	st.Skills, err = s.skills(ctx, id)
 	return st, err
 }
 
@@ -250,6 +267,34 @@ func (s *Service) parents(ctx context.Context, studentID int64) ([]ParentRef, er
 		return nil, err
 	}
 	return pgx.CollectRows(rows, pgx.RowToStructByPos[ParentRef])
+}
+
+func (s *Service) skills(ctx context.Context, studentID int64) ([]SkillRef, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT s.id, s.name::text, ss.proficiency
+		FROM student_skills ss JOIN skills s ON s.id = ss.skill_id
+		WHERE ss.student_id = $1 AND ss.is_active ORDER BY s.name`, studentID)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[SkillRef])
+}
+
+// ensureSkill finds a skill by name (case-insensitive) or creates it with category "technical".
+func ensureSkill(ctx context.Context, tx pgx.Tx, name string, actorID int64) (int64, error) {
+	name = strings.TrimSpace(name)
+	var id int64
+	err := tx.QueryRow(ctx, `SELECT id FROM skills WHERE lower(name::text) = lower($1) AND is_active`, name).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if !dbutil.IsNoRows(err) {
+		return 0, err
+	}
+	// Auto-create the skill
+	err = tx.QueryRow(ctx, `INSERT INTO skills (name, category, created_by, updated_by) VALUES ($1, 'technical', $2, $2) RETURNING id`,
+		name, actorID).Scan(&id)
+	return id, err
 }
 
 // ---- writes ----
@@ -388,6 +433,21 @@ func (s *Service) CreateInTx(ctx context.Context, tx pgx.Tx, actorID int64, in I
 			return 0, prefixErr(fmt.Sprintf("Parent %d: ", i+1), err)
 		}
 	}
+	for _, sk := range in.Skills {
+		if strings.TrimSpace(sk.Name) == "" {
+			continue
+		}
+		skillID, err := ensureSkill(ctx, tx, sk.Name, actorID)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO student_skills (student_id, skill_id, proficiency, source, created_by, updated_by)
+			VALUES ($1, $2, $3, 'manual', $4, $4)
+			ON CONFLICT (student_id, skill_id) WHERE is_active DO UPDATE SET proficiency = $3, updated_by = $4`,
+			id, skillID, sk.Proficiency, actorID); err != nil {
+			return 0, err
+		}
+	}
 	return id, nil
 }
 
@@ -406,11 +466,34 @@ func (s *Service) Update(ctx context.Context, a actor.Actor, id int64, in Input)
 			id, n.RegisterNo, n.Name, n.Mobile, n.Email, n.Username, n.DepartmentID, n.Gender, n.dob, a.ID); err != nil {
 			return mapWriteErr(err)
 		}
-		_, err := tx.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 			UPDATE student_profiles SET register_no = $2, admission_year = $3, batch = $4, current_class_id = $5,
 			       blood_group = $6, address = $7, updated_by = $8 WHERE user_id = $1 AND is_active`,
-			id, n.RegisterNo, n.AdmissionYear, n.Batch, n.ClassID, n.BloodGroup, n.Address, a.ID)
-		return mapWriteErr(err)
+			id, n.RegisterNo, n.AdmissionYear, n.Batch, n.ClassID, n.BloodGroup, n.Address, a.ID); err != nil {
+			return mapWriteErr(err)
+		}
+		// Replace manual skills: deactivate old ones, insert new ones
+		if in.Skills != nil {
+			if _, err := tx.Exec(ctx, `UPDATE student_skills SET is_active = false, updated_by = $2 WHERE student_id = $1 AND is_active AND source = 'manual'`, id, a.ID); err != nil {
+				return err
+			}
+			for _, sk := range in.Skills {
+				if strings.TrimSpace(sk.Name) == "" {
+					continue
+				}
+				skillID, err := ensureSkill(ctx, tx, sk.Name, a.ID)
+				if err != nil {
+					return err
+				}
+				if _, err := tx.Exec(ctx, `INSERT INTO student_skills (student_id, skill_id, proficiency, source, created_by, updated_by)
+					VALUES ($1, $2, $3, 'manual', $4, $4)
+					ON CONFLICT (student_id, skill_id) WHERE is_active DO UPDATE SET proficiency = $3, updated_by = $4`,
+					id, skillID, sk.Proficiency, a.ID); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err

@@ -392,6 +392,34 @@ class BulkApi {
       UploadJob((await api.upload('/bulk-upload/skills', 'file', file, fields: {'dry_run': dryRun}))
           as Map<String, dynamic>);
 
+  Future<UploadJob> departments(MultipartFile file, {required bool dryRun}) async =>
+      UploadJob((await api.upload('/bulk-upload/departments', 'file', file, fields: {'dry_run': dryRun}))
+          as Map<String, dynamic>);
+
+  Future<UploadJob> subjects(MultipartFile file, {required bool dryRun}) async =>
+      UploadJob((await api.upload('/bulk-upload/subjects', 'file', file, fields: {'dry_run': dryRun}))
+          as Map<String, dynamic>);
+
+  Future<UploadJob> companies(MultipartFile file, {required bool dryRun}) async =>
+      UploadJob((await api.upload('/bulk-upload/companies', 'file', file, fields: {'dry_run': dryRun}))
+          as Map<String, dynamic>);
+
+  Future<UploadJob> examTypes(MultipartFile file, {required bool dryRun}) async =>
+      UploadJob((await api.upload('/bulk-upload/exam-types', 'file', file, fields: {'dry_run': dryRun}))
+          as Map<String, dynamic>);
+
+  Future<UploadJob> academicYears(MultipartFile file, {required bool dryRun}) async =>
+      UploadJob((await api.upload('/bulk-upload/academic-years', 'file', file, fields: {'dry_run': dryRun}))
+          as Map<String, dynamic>);
+
+  Future<UploadJob> skillMaster(MultipartFile file, {required bool dryRun}) async =>
+      UploadJob((await api.upload('/bulk-upload/skill-master', 'file', file, fields: {'dry_run': dryRun}))
+          as Map<String, dynamic>);
+
+  Future<UploadJob> placementDrives(MultipartFile file, {required bool dryRun}) async =>
+      UploadJob((await api.upload('/bulk-upload/placement-drives', 'file', file, fields: {'dry_run': dryRun}))
+          as Map<String, dynamic>);
+
   Future<Paged<Map<String, dynamic>>> jobs({int page = 1, int pageSize = 20, String? uploadType}) =>
       api.list('/bulk-upload/jobs', query: {'page': page, 'page_size': pageSize, 'upload_type': uploadType});
 

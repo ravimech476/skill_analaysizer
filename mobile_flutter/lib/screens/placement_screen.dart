@@ -7,15 +7,11 @@ import '../api/models.dart';
 import '../auth/session.dart';
 import '../main.dart';
 import '../theme.dart';
-import '../widgets/charts.dart';
 import '../widgets/common.dart';
 import '../widgets/files.dart';
-import '../widgets/master_crud.dart';
+import '../widgets/import_upload.dart';
 import '../widgets/pickers.dart';
-import 'analyzer_screen.dart';
-
-/// Staff run drives, applications and offers; students and parents see what they
-/// are eligible for and how their applications are going.
+/// Staff see placement drives; students and parents see what they are eligible for.
 class PlacementScreen extends StatelessWidget {
   const PlacementScreen({super.key});
 
@@ -25,10 +21,25 @@ class PlacementScreen extends StatelessWidget {
     if (!session.isStaff) return const _MyPlacement();
 
     final tabs = <(String, Widget)>[
-      ('Drives', const _DrivesTab()),
-      ('Offers', const _PlacementsTab()),
-      ('Companies', const _CompaniesTab()),
+      ('Drives', const _DrivesView()),
+      if (session.can(['job_role.create']))
+        (
+          'Import',
+          ListView(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+            children: [
+              ImportUpload(
+                title: 'Placement Drives',
+                hint:
+                    'One row per drive: company_name (must exist), title, package_lpa, drive_date, skills (format: Programming:3,SQL:2).',
+                upload: (file, {required dryRun}) =>
+                    bulkApi.placementDrives(file, dryRun: dryRun),
+              ),
+            ],
+          )
+        ),
     ];
+
     return DefaultTabController(
       length: tabs.length,
       child: Scaffold(
@@ -42,14 +53,14 @@ class PlacementScreen extends StatelessWidget {
 
 // ---------------------------------------------------------------- drives
 
-class _DrivesTab extends StatefulWidget {
-  const _DrivesTab();
+class _DrivesView extends StatefulWidget {
+  const _DrivesView();
 
   @override
-  State<_DrivesTab> createState() => _DrivesTabState();
+  State<_DrivesView> createState() => _DrivesViewState();
 }
 
-class _DrivesTabState extends State<_DrivesTab> {
+class _DrivesViewState extends State<_DrivesView> {
   String _search = '';
   String? _status;
   int _reload = 0;
@@ -113,6 +124,16 @@ class _DrivesTabState extends State<_DrivesTab> {
                                 await push(context, JobRoleScreen(roleId: r.id));
                                 setState(() => _reload++);
                               },
+                              onEdit: session.can(['job_role.update']) ? () async {
+                                final saved = await showFormSheet<bool>(context, 'Edit drive', (ctx) => JobRoleForm(role: r));
+                                if (saved == true) setState(() => _reload++);
+                              } : null,
+                              onDelete: session.can(['job_role.delete']) ? () async {
+                                final yes = await confirm(context, 'Delete "${r.title}"?', 'This will remove the ${r.companyName} drive permanently.');
+                                if (!yes) return;
+                                await runAction(context, () => placementApi.deleteRole(r.id), success: 'Drive deleted');
+                                setState(() => _reload++);
+                              } : null,
                             ),
                           ))
                       .toList(),
@@ -127,9 +148,11 @@ class _DrivesTabState extends State<_DrivesTab> {
 }
 
 class _DriveCard extends StatelessWidget {
-  const _DriveCard({required this.role, required this.onTap});
+  const _DriveCard({required this.role, required this.onTap, this.onEdit, this.onDelete});
   final JobRole role;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -178,6 +201,30 @@ class _DriveCard extends StatelessWidget {
                   if (role.applicationCount > 0) Tag('${role.applicationCount} applied'),
                   if (role.selectedCount > 0) Tag('${role.selectedCount} selected', color: Brand.success),
                 ]),
+                if (onEdit != null || onDelete != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (onEdit != null)
+                        TextButton.icon(
+                          onPressed: onEdit,
+                          icon: const Icon(Icons.edit_outlined, size: 16),
+                          label: const Text('Edit', style: TextStyle(fontSize: 13)),
+                          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                        ),
+                      if (onDelete != null) ...[
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: onDelete,
+                          icon: const Icon(Icons.delete_outline, size: 16, color: Brand.error),
+                          label: const Text('Delete', style: TextStyle(fontSize: 13, color: Brand.error)),
+                          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -185,7 +232,7 @@ class _DriveCard extends StatelessWidget {
       );
 }
 
-/// One drive: requirements, the ranking shortcut, applications and files.
+/// One drive: requirements, eligible students inline, applications and files.
 class JobRoleScreen extends StatefulWidget {
   const JobRoleScreen({super.key, required this.roleId});
   final int roleId;
@@ -306,24 +353,11 @@ class _JobRoleScreenState extends State<JobRoleScreen> {
               else if (role.jd != null)
                 SectionCard(title: 'Job description', child: FileTile(link: role.jd!)),
               const SizedBox(height: 10),
-              if (session.can(['skill_analyzer.view']))
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.insights_outlined, color: Brand.accent),
-                    title: const Text('Rank students for this drive',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    subtitle: Text(
-                      role.analyzedAt == null
-                          ? 'Not analysed yet'
-                          : 'Last run ${fmtDateTime(role.analyzedAt)}',
-                      style: const TextStyle(fontSize: 12.5),
-                    ),
-                    trailing: const Icon(Icons.chevron_right, size: 18, color: Brand.muted),
-                    onTap: () async {
-                      await push(context, SubPage(title: 'Skill Analyzer', child: AnalyzerScreen(roleId: role.id)));
-                      setState(() => _reload++);
-                    },
-                  ),
+              if (session.can(['skill_analyzer.view']) &&
+                  (role.status == 'open' || role.status == 'upcoming'))
+                _EligibleStudentsSection(
+                  roleId: role.id,
+                  onShortlisted: () => setState(() => _reload++),
                 ),
               const SizedBox(height: 10),
               SectionCard(
@@ -374,6 +408,314 @@ class _JobRoleScreenState extends State<JobRoleScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------- eligible students
+
+/// Groups matches by department, then by class, with checkboxes for shortlisting.
+class _EligibleStudentsSection extends StatefulWidget {
+  const _EligibleStudentsSection({required this.roleId, required this.onShortlisted});
+  final int roleId;
+  final VoidCallback onShortlisted;
+
+  @override
+  State<_EligibleStudentsSection> createState() => _EligibleStudentsSectionState();
+}
+
+class _EligibleStudentsSectionState extends State<_EligibleStudentsSection> {
+  Ranking? _ranking;
+  bool _loading = true;
+  String? _error;
+  final Set<int> _selected = {};
+  bool _shortlisting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _analyze();
+  }
+
+  Future<void> _analyze() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final ranking = await placementApi.analyze(widget.roleId);
+      if (!mounted) return;
+      // Pre-select all eligible students.
+      final eligibleIds = ranking.matches.where((m) => m.isEligible).map((m) => m.studentId).toSet();
+      setState(() {
+        _ranking = ranking;
+        _selected
+          ..clear()
+          ..addAll(eligibleIds);
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = errorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  /// Builds a nested map: departmentCode -> classLabel -> [Match]
+  Map<String, Map<String, List<Match>>> _grouped() {
+    final out = <String, Map<String, List<Match>>>{};
+    for (final m in _ranking!.matches) {
+      final dept = m.departmentCode ?? 'Other';
+      final cls = m.classLabel ?? 'Unassigned';
+      out.putIfAbsent(dept, () => <String, List<Match>>{});
+      out[dept]!.putIfAbsent(cls, () => <Match>[]);
+      out[dept]![cls]!.add(m);
+    }
+    return out;
+  }
+
+  Future<void> _shortlist() async {
+    if (_selected.isEmpty) {
+      toast(context, 'Select at least one student', error: true);
+      return;
+    }
+    setState(() => _shortlisting = true);
+    final ok = await runAction(
+      context,
+      () => placementApi.shortlist(widget.roleId, _selected.toList()),
+      success: 'Shortlisted ${_selected.length} student${_selected.length == 1 ? '' : 's'} and notified',
+    );
+    if (mounted) setState(() => _shortlisting = false);
+    if (ok) widget.onShortlisted();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const SectionCard(
+        title: 'Eligible Students',
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Center(child: Column(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 12),
+              Text('Analysing students...', style: TextStyle(fontSize: 13, color: Brand.textSoft)),
+            ],
+          )),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return SectionCard(
+        title: 'Eligible Students',
+        child: Column(
+          children: [
+            Text(_error!, style: const TextStyle(fontSize: 13, color: Brand.error)),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _analyze,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final ranking = _ranking!;
+    if (ranking.matches.isEmpty) {
+      return const SectionCard(
+        title: 'Eligible Students',
+        child: Text('No students found for this drive', style: TextStyle(fontSize: 13, color: Brand.muted)),
+      );
+    }
+
+    final grouped = _grouped();
+
+    return SectionCard(
+      title: 'Eligible Students (${ranking.eligible} of ${ranking.total})',
+      trailing: IconButton(
+        icon: const Icon(Icons.refresh, size: 20),
+        tooltip: 'Re-analyse',
+        onPressed: _analyze,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final deptEntry in grouped.entries) ...[
+            () {
+              final deptStudents = deptEntry.value.values.expand((l) => l).toList();
+              final selectableDept = deptStudents.where((m) => m.isEligible && m.applicationStatus == null).map((m) => m.studentId).toSet();
+              final allDeptSelected = selectableDept.isNotEmpty && selectableDept.every(_selected.contains);
+              return Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Department: ${deptEntry.key} (${deptStudents.where((m) => m.isEligible).length})',
+                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Brand.text)),
+                    if (selectableDept.isNotEmpty)
+                      GestureDetector(
+                        onTap: () => setState(() {
+                          if (allDeptSelected) { _selected.removeAll(selectableDept); } else { _selected.addAll(selectableDept); }
+                        }),
+                        child: Text(allDeptSelected ? 'Deselect all ${deptEntry.key}' : 'Select all ${deptEntry.key}',
+                            style: TextStyle(fontSize: 12, color: Brand.accent, fontWeight: FontWeight.w500)),
+                      ),
+                  ],
+                ),
+              );
+            }(),
+            for (final clsEntry in deptEntry.value.entries) ...[
+              () {
+                final selectableCls = clsEntry.value.where((m) => m.isEligible && m.applicationStatus == null).map((m) => m.studentId).toSet();
+                final allClsSelected = selectableCls.isNotEmpty && selectableCls.every(_selected.contains);
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8, top: 6, bottom: 2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('${clsEntry.key} (${clsEntry.value.where((m) => m.isEligible).length} eligible)',
+                          style: const TextStyle(fontSize: 12.5, color: Brand.textSoft, fontWeight: FontWeight.w500)),
+                      if (selectableCls.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => setState(() {
+                            if (allClsSelected) { _selected.removeAll(selectableCls); } else { _selected.addAll(selectableCls); }
+                          }),
+                          child: Text(allClsSelected ? 'Deselect all' : 'Select all',
+                              style: TextStyle(fontSize: 11.5, color: Brand.accent, fontWeight: FontWeight.w500)),
+                        ),
+                    ],
+                  ),
+                );
+              }(),
+              ...clsEntry.value.map((m) => _StudentCheckTile(
+                    match: m,
+                    selected: _selected.contains(m.studentId),
+                    onChanged: (on) => setState(() {
+                      if (on) {
+                        _selected.add(m.studentId);
+                      } else {
+                        _selected.remove(m.studentId);
+                      }
+                    }),
+                  )),
+            ],
+          ],
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: _shortlisting || _selected.isEmpty ? null : _shortlist,
+            icon: _shortlisting
+                ? const SizedBox(
+                    width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.send_outlined, size: 18),
+            label: Text('Shortlist & Notify (${_selected.length} selected)'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One student row inside the eligible-students section.
+class _StudentCheckTile extends StatelessWidget {
+  const _StudentCheckTile({required this.match, required this.selected, required this.onChanged});
+  final Match match;
+  final bool selected;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final allSkills = [...match.matched, ...match.missing];
+    return InkWell(
+      onTap: () => onChanged(!selected),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 32,
+              child: Checkbox(
+                value: selected,
+                onChanged: (v) => onChanged(v ?? false),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(match.name,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                              color: match.isEligible ? Brand.text : Brand.muted,
+                            )),
+                      ),
+                      Text('CGPA: ${match.cgpa.toStringAsFixed(1)}',
+                          style: const TextStyle(fontSize: 12, color: Brand.textSoft)),
+                    ],
+                  ),
+                  if (!match.isEligible && match.reasons.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(match.reasons.join(', '),
+                          style: const TextStyle(fontSize: 11, color: Brand.error)),
+                    ),
+                  if (allSkills.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: allSkills
+                            .map((g) => _SkillTag(name: g.name, met: g.met))
+                            .toList(),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A small tag showing a skill name with a check or cross indicator.
+class _SkillTag extends StatelessWidget {
+  const _SkillTag({required this.name, required this.met});
+  final String name;
+  final bool met;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = met ? Brand.success : Brand.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(name, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500)),
+          const SizedBox(width: 3),
+          Icon(met ? Icons.check_circle : Icons.cancel, size: 12, color: color),
+        ],
+      ),
     );
   }
 }
@@ -622,128 +964,6 @@ class _JobRoleFormState extends State<JobRoleForm> {
     if (mounted) setState(() => _busy = false);
     if (ok && mounted) Navigator.pop(context, true);
   }
-}
-
-// ---------------------------------------------------------------- offers & companies
-
-class _PlacementsTab extends StatefulWidget {
-  const _PlacementsTab();
-
-  @override
-  State<_PlacementsTab> createState() => _PlacementsTabState();
-}
-
-class _PlacementsTabState extends State<_PlacementsTab> {
-  String _search = '';
-
-  @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-            child: SearchBox(hint: 'Student or company', onChanged: (v) => setState(() => _search = v)),
-          ),
-          Expanded(
-            child: AsyncView<(List<Placement>, Map<String, dynamic>)>(
-              refreshKey: _search,
-              load: () async => (await placementApi.placements(search: _search), await placementApi.stats()),
-              builder: (context, data, reload) {
-                final (placements, stats) = data;
-                final byDept = maps(stats['by_department']);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TileGrid(children: [
-                      StatTile(
-                        label: 'Placed',
-                        value: '${asInt(stats['placed_students'])}',
-                        hint: '${asDouble(stats['placed_percent']).toStringAsFixed(1)}% of ${asInt(stats['total_students'])}',
-                        color: Brand.success,
-                      ),
-                      StatTile(label: 'Offers', value: '${asInt(stats['total_offers'])}'),
-                      StatTile(
-                        label: 'Highest',
-                        value: stats['highest_package'] == null ? '—' : lpa(asDouble(stats['highest_package'])),
-                        color: Brand.accent,
-                      ),
-                      StatTile(
-                        label: 'Average',
-                        value: stats['average_package'] == null ? '—' : lpa(asDouble(stats['average_package'])),
-                      ),
-                    ]),
-                    const SizedBox(height: 12),
-                    if (byDept.isNotEmpty)
-                      SectionCard(
-                        title: 'Placed by department',
-                        child: BarChart(
-                          suffix: '%',
-                          max: 100,
-                          rows: byDept
-                              .map((d) => BarRow(
-                                    text(d['code']),
-                                    asDouble(d['percent']),
-                                    caption: '${asInt(d['placed'])} of ${asInt(d['students'])}',
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    if (placements.isEmpty)
-                      const EmptyView('No offers recorded yet')
-                    else
-                      ...placements.map((p) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Card(
-                              child: ListTile(
-                                title: Text(p.studentName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                                subtitle: Text(
-                                  '${p.registerNo} · ${p.companyName} · ${p.jobTitle}'
-                                  '${p.offerDate == null ? '' : ' · ${fmtDate(p.offerDate)}'}',
-                                  style: const TextStyle(fontSize: 12.5),
-                                ),
-                                trailing: Tag(lpa(p.packageLpa), color: Brand.success),
-                              ),
-                            ),
-                          )),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
-      );
-}
-
-class _CompaniesTab extends StatelessWidget {
-  const _CompaniesTab();
-
-  @override
-  Widget build(BuildContext context) => MasterCrud(
-        path: 'companies',
-        permission: 'company',
-        noun: 'company',
-        fields: const [
-          MasterField('name', 'Company name', required: true),
-          MasterField('industry', 'Industry'),
-          MasterField('location', 'Location'),
-          MasterField('website', 'Website'),
-          MasterField('contact_person', 'Contact person'),
-          MasterField('contact_email', 'Contact email'),
-          MasterField('contact_mobile', 'Contact mobile'),
-          MasterField('description', 'Notes'),
-        ],
-        title: _companyTitle,
-        badges: _companyBadges,
-      );
-
-  static (String, String?) _companyTitle(MasterRow r) => (
-        text(r['name']),
-        [r['industry'], r['location']].whereType<String>().join(' · '),
-      );
-
-  static List<Widget> _companyBadges(MasterRow r) => [
-        if (asInt(r['job_role_count']) > 0) Tag('${asInt(r['job_role_count'])} drives'),
-      ];
 }
 
 // ---------------------------------------------------------------- student / parent

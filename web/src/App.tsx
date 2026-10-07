@@ -11,38 +11,46 @@ const UsersPage = lazy(() => import('./pages/UsersPage'));
 const RolesPage = lazy(() => import('./pages/RolesPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 import ComingSoonPage from './pages/ComingSoonPage';
-const AcademicPage = lazy(() => import('./pages/AcademicPage'));
+const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage'));
+const SubjectsPage = lazy(() => import('./pages/SubjectsPage'));
+const ExamTypesPage = lazy(() => import('./pages/ExamTypesPage'));
+const AcademicYearsPage = lazy(() => import('./pages/AcademicYearsPage'));
 const ClassesPage = lazy(() => import('./pages/ClassesPage'));
 const StaffPage = lazy(() => import('./pages/StaffPage'));
 const StudentsPage = lazy(() => import('./pages/StudentsPage'));
-const BulkUploadPage = lazy(() => import('./pages/BulkUploadPage'));
 const MarksPage = lazy(() => import('./pages/MarksPage'));
-const SkillsPage = lazy(() => import('./pages/SkillsPage'));
-const PlacementPage = lazy(() => import('./pages/PlacementPage'));
-const AnalyzerPage = lazy(() => import('./pages/AnalyzerPage'));
-const CareersPage = lazy(() => import('./pages/CareersPage'));
+const SkillMasterPage = lazy(() => import('./pages/SkillMasterPage'));
+const CompaniesPage = lazy(() => import('./pages/CompaniesPage'));
+const PlacementDrivesPage = lazy(() => import('./pages/PlacementPage'));
+const PlacementHistoryPage = lazy(() => import('./pages/PlacementHistoryPage'));
+const StudentAnalysisPage = lazy(() => import('./pages/StudentAnalysisPage'));
+const ClassAnalysisPage = lazy(() => import('./pages/ClassAnalysisPage'));
+const DeptAnalysisPage = lazy(() => import('./pages/DeptAnalysisPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
-const YearEndPage = lazy(() => import('./pages/YearEndPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
-const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
+const ThresholdPage = lazy(() => import('./pages/ThresholdPage'));
 
 const PAGES: Record<string, ReactNode> = {
   users: <UsersPage />,
   roles: <RolesPage />,
-  academic: <AcademicPage />,
+  departments: <DepartmentsPage />,
+  subjects: <SubjectsPage />,
+  examtypes: <ExamTypesPage />,
+  academicyears: <AcademicYearsPage />,
   classes: <ClassesPage />,
   staff: <StaffPage />,
   students: <StudentsPage />,
-  bulk: <BulkUploadPage />,
   marks: <MarksPage />,
-  skills: <SkillsPage />,
-  placement: <PlacementPage />,
-  analyzer: <AnalyzerPage />,
-  careers: <CareersPage />,
+  skillmaster: <SkillMasterPage />,
+  companies: <CompaniesPage />,
+  drives: <PlacementDrivesPage />,
+  history: <PlacementHistoryPage />,
+  studentanalysis: <StudentAnalysisPage />,
+  classanalysis: <ClassAnalysisPage />,
+  deptanalysis: <DeptAnalysisPage />,
   notifications: <NotificationsPage />,
-  yearend: <YearEndPage />,
   reports: <ReportsPage />,
-  documents: <DocumentsPage />,
+  threshold: <ThresholdPage />,
 };
 
 /** Shown while a page's code chunk is loading. */

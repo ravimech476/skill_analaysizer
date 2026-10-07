@@ -6,10 +6,11 @@ import '../api/models.dart';
 import '../auth/session.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/import_upload.dart';
 import '../widgets/master_crud.dart';
 import '../widgets/pickers.dart';
 
-/// The academic setup: departments, academic years, subjects, exam types, grades,
+/// The academic setup: academic years, subjects, exam types, grades,
 /// the curriculum and who teaches what.
 class AcademicScreen extends StatelessWidget {
   const AcademicScreen({super.key});
@@ -18,13 +19,13 @@ class AcademicScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = context.watch<Session>();
     final tabs = <(String, Widget)>[
-      ('Departments', _departments()),
       ('Years', _years()),
       ('Subjects', _subjects()),
       ('Exams', _exams()),
       ('Grades', _grades()),
       ('Curriculum', const _Curriculum()),
       if (session.can(['subject_allocation.view'])) ('Who teaches', const _Allocations()),
+      if (session.can(['subject.create'])) ('Import', const _AcademicImport()),
     ];
     return DefaultTabController(
       length: tabs.length,
@@ -35,26 +36,6 @@ class AcademicScreen extends StatelessWidget {
       ),
     );
   }
-
-  static Widget _departments() => MasterCrud(
-        path: 'departments',
-        permission: 'department',
-        noun: 'department',
-        fields: [
-          const MasterField('name', 'Department name', required: true),
-          const MasterField('code', 'Code', type: MasterFieldType.upper, required: true),
-          MasterField('hod_id', 'Head of department', type: MasterFieldType.reference, lookup: Lookups.staff),
-        ],
-        title: _departmentTitle,
-        badges: _departmentBadges,
-      );
-
-  static (String, String?) _departmentTitle(MasterRow r) =>
-      ('${r['code']} · ${r['name']}', r['hod_name'] == null ? 'No HOD assigned' : 'HOD: ${r['hod_name']}');
-
-  static List<Widget> _departmentBadges(MasterRow r) => [
-        Tag('${asInt(r['student_count'])} students'),
-      ];
 
   static Widget _years() => MasterCrud(
         path: 'academic-years',
@@ -479,4 +460,24 @@ class _AllocationFormState extends State<_AllocationForm> {
           ),
         ],
       );
+}
+
+// ---------------------------------------------------------------- import
+
+class _AcademicImport extends StatelessWidget {
+  const _AcademicImport();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+      children: [
+        ImportUpload(
+          title: 'subjects',
+          hint: 'One row per subject: code, name, credits and optional department code.',
+          upload: (file, {required dryRun}) => bulkApi.subjects(file, dryRun: dryRun),
+        ),
+      ],
+    );
+  }
 }

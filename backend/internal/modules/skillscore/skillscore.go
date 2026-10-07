@@ -29,6 +29,8 @@ const (
 	ConfigWeights = "skill_score_weights"
 	// ConfigMatch holds the skill/academic split of a match score: {"skill":0.7,"academic":0.3}.
 	ConfigMatch = "match_weights"
+	// ConfigThreshold holds the minimum mark percentage for auto-assigning skills.
+	ConfigThreshold = "global_mark_threshold"
 )
 
 // LevelStep converts a 1-5 proficiency level to the 0-100 scale (level 4 → 80).
@@ -42,6 +44,16 @@ type Setting struct {
 	Description *string         `json:"description"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 	UpdatedBy   *string         `json:"updated_by"`
+}
+
+// configValue returns the raw JSON value of a config key, or "{}" when the key does not exist.
+func configValue(ctx context.Context, q dbutil.DBTX, key string) (json.RawMessage, error) {
+	var raw json.RawMessage
+	err := q.QueryRow(ctx, `SELECT value FROM app_config WHERE key = $1`, key).Scan(&raw)
+	if dbutil.IsNoRows(err) {
+		return json.RawMessage("{}"), nil
+	}
+	return raw, err
 }
 
 // Weights reads a weight map from app_config. Missing keys count as zero.

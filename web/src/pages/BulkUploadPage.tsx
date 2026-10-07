@@ -9,7 +9,7 @@ import { uploadsApi } from '../api/reports';
 import { useClasses } from '../api/lookups';
 import { useAuth } from '../auth/AuthContext';
 
-const TYPE_LABEL: Record<string, string> = { students: 'Students', staff: 'Staff', skills: 'Skills', marks: 'Marks' };
+const TYPE_LABEL: Record<string, string> = { students: 'Students', staff: 'Staff', skills: 'Skills', marks: 'Marks', departments: 'Departments', subjects: 'Subjects', companies: 'Companies' };
 
 export function JobResult({ job, codeLabel = 'Register no', okLabel = 'Created' }: { job: UploadJob; codeLabel?: string; okLabel?: string }) {
   const allOk = job.failed_rows === 0;
@@ -83,7 +83,7 @@ export function XlsxPicker({ file, onChange }: { file: File | null; onChange: (f
   );
 }
 
-interface PanelProps {
+export interface PanelProps {
   title: string;
   help: ReactNode;
   template: ReactNode;
@@ -96,7 +96,7 @@ interface PanelProps {
   onSaved?: () => void;
 }
 
-function UploadPanel({ title, help, template, options, actionLabel, codeLabel, okLabel, canSubmit = true, run, onSaved }: PanelProps) {
+export function UploadPanel({ title, help, template, options, actionLabel, codeLabel, okLabel, canSubmit = true, run, onSaved }: PanelProps) {
   const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [dryRun, setDryRun] = useState(true);
@@ -144,7 +144,7 @@ function UploadPanel({ title, help, template, options, actionLabel, codeLabel, o
   );
 }
 
-function PasswordOption({ value, onChange, who }: { value: string; onChange: (v: string) => void; who: string }) {
+export function PasswordOption({ value, onChange, who }: { value: string; onChange: (v: string) => void; who: string }) {
   return (
     <>
       <Input.Password
@@ -159,7 +159,7 @@ function PasswordOption({ value, onChange, who }: { value: string; onChange: (v:
   );
 }
 
-function StudentsUpload() {
+export function StudentsUpload() {
   const qc = useQueryClient();
   const [createClasses, setCreateClasses] = useState(false);
   const [password, setPassword] = useState('');
@@ -193,7 +193,7 @@ function StudentsUpload() {
   );
 }
 
-function StaffUpload() {
+export function StaffUpload() {
   const qc = useQueryClient();
   const [password, setPassword] = useState('');
   return (
@@ -216,7 +216,7 @@ function StaffUpload() {
   );
 }
 
-function SkillsUpload() {
+export function SkillsUpload() {
   const qc = useQueryClient();
   const { data: classes } = useClasses();
   const [classId, setClassId] = useState<number>();
@@ -244,6 +244,149 @@ function SkillsUpload() {
       }
       run={(file, dry_run) => uploadsApi.skills(file, { dry_run })}
       onSaved={() => qc.invalidateQueries({ queryKey: ['student-skills'] })}
+    />
+  );
+}
+
+export function DepartmentsUpload() {
+  const qc = useQueryClient();
+  return (
+    <UploadPanel
+      title="Departments"
+      codeLabel="Code"
+      okLabel="Created"
+      actionLabel="Import departments"
+      help="One row per department. Code must be unique (e.g. CSE, ECE). Optionally set an HOD by their employee code."
+      template={
+        <Button icon={<DownloadOutlined />} onClick={() => bulkApi.departmentsTemplate().then((b) => saveBlob(b, 'departments_upload_template.xlsx')).catch((e) => message.error(errorMessage(e)))}>
+          Download template (.xlsx)
+        </Button>
+      }
+      run={(file, dry_run) => bulkApi.uploadDepartments(file, dry_run)}
+      onSaved={() => qc.invalidateQueries({ queryKey: ['departments'] })}
+    />
+  );
+}
+
+export function SubjectsUpload() {
+  const qc = useQueryClient();
+  return (
+    <UploadPanel
+      title="Subjects"
+      codeLabel="Code"
+      okLabel="Created"
+      actionLabel="Import subjects"
+      help="One row per subject. Code must be unique (e.g. CS101). Type can be theory, lab, elective or project."
+      template={
+        <Button icon={<DownloadOutlined />} onClick={() => bulkApi.subjectsTemplate().then((b) => saveBlob(b, 'subjects_upload_template.xlsx')).catch((e) => message.error(errorMessage(e)))}>
+          Download template (.xlsx)
+        </Button>
+      }
+      run={(file, dry_run) => bulkApi.uploadSubjects(file, dry_run)}
+      onSaved={() => qc.invalidateQueries({ queryKey: ['subjects'] })}
+    />
+  );
+}
+
+export function ExamTypesUpload() {
+  const qc = useQueryClient();
+  return (
+    <UploadPanel
+      title="Exam Types"
+      codeLabel="Code"
+      okLabel="Created"
+      actionLabel="Import exam types"
+      help="One row per exam type. Code must be unique (e.g. IA1, SEM). Max marks is required. Pass percent defaults to 50."
+      template={
+        <Button icon={<DownloadOutlined />} onClick={() => bulkApi.examTypesTemplate().then((b) => saveBlob(b, 'exam_types_upload_template.xlsx')).catch((e) => message.error(errorMessage(e)))}>
+          Download template (.xlsx)
+        </Button>
+      }
+      run={(file, dry_run) => bulkApi.uploadExamTypes(file, dry_run)}
+      onSaved={() => qc.invalidateQueries({ queryKey: ['exam-types'] })}
+    />
+  );
+}
+
+export function AcademicYearsUpload() {
+  const qc = useQueryClient();
+  return (
+    <UploadPanel
+      title="Academic Years"
+      codeLabel="Name"
+      okLabel="Created"
+      actionLabel="Import academic years"
+      help="One row per academic year. Name must be unique (e.g. 2026-27). Start and end dates in YYYY-MM-DD format."
+      template={
+        <Button icon={<DownloadOutlined />} onClick={() => bulkApi.academicYearsTemplate().then((b) => saveBlob(b, 'academic_years_upload_template.xlsx')).catch((e) => message.error(errorMessage(e)))}>
+          Download template (.xlsx)
+        </Button>
+      }
+      run={(file, dry_run) => bulkApi.uploadAcademicYears(file, dry_run)}
+      onSaved={() => qc.invalidateQueries({ queryKey: ['academic-years'] })}
+    />
+  );
+}
+
+export function CompaniesUpload() {
+  const qc = useQueryClient();
+  return (
+    <UploadPanel
+      title="Companies"
+      codeLabel="Name"
+      okLabel="Created"
+      actionLabel="Import companies"
+      help="One row per company. Name must be unique. Industry, location, website and contact details are optional."
+      template={
+        <Button icon={<DownloadOutlined />} onClick={() => bulkApi.companiesTemplate().then((b) => saveBlob(b, 'companies_upload_template.xlsx')).catch((e) => message.error(errorMessage(e)))}>
+          Download template (.xlsx)
+        </Button>
+      }
+      run={(file, dry_run) => bulkApi.uploadCompanies(file, dry_run)}
+      onSaved={() => qc.invalidateQueries({ queryKey: ['companies'] })}
+    />
+  );
+}
+
+export function SkillMasterUpload() {
+  const qc = useQueryClient();
+  return (
+    <UploadPanel
+      title="Skills"
+      codeLabel="Name"
+      okLabel="Created"
+      actionLabel="Import skills"
+      help="One row per skill. Name must be unique. Category can be: programming, framework, database, tool, technical, soft_skill, or domain."
+      template={
+        <Button icon={<DownloadOutlined />} onClick={() => bulkApi.skillMasterTemplate().then((b) => saveBlob(b, 'skill_master_upload_template.xlsx')).catch((e) => message.error(errorMessage(e)))}>
+          Download template (.xlsx)
+        </Button>
+      }
+      run={(file, dry_run) => bulkApi.uploadSkillMaster(file, dry_run)}
+      onSaved={() => {
+        qc.invalidateQueries({ queryKey: ['skills'] });
+        qc.invalidateQueries({ queryKey: ['lookup', 'skills'] });
+      }}
+    />
+  );
+}
+
+export function PlacementDrivesUpload() {
+  const qc = useQueryClient();
+  return (
+    <UploadPanel
+      title="Placement Drives"
+      codeLabel="Title"
+      okLabel="Created"
+      actionLabel="Import drives"
+      help="One row per drive. Company name must match an existing company. Skills format: Programming:3,SQL:2 (skill_name:level, comma separated)."
+      template={
+        <Button icon={<DownloadOutlined />} onClick={() => bulkApi.placementDrivesTemplate().then((b) => saveBlob(b, 'placement_drives_upload_template.xlsx')).catch((e) => message.error(errorMessage(e)))}>
+          Download template (.xlsx)
+        </Button>
+      }
+      run={(file, dry_run) => bulkApi.uploadPlacementDrives(file, dry_run)}
+      onSaved={() => qc.invalidateQueries({ queryKey: ['job-roles'] })}
     />
   );
 }
@@ -313,6 +456,9 @@ function History() {
 export default function BulkUploadPage() {
   const { can } = useAuth();
   const tabs = [
+    ...(can('department.create') ? [{ key: 'departments', label: 'Departments', children: <DepartmentsUpload /> }] : []),
+    ...(can('subject.create') ? [{ key: 'subjects', label: 'Subjects', children: <SubjectsUpload /> }] : []),
+    ...(can('company.create') ? [{ key: 'companies', label: 'Companies', children: <CompaniesUpload /> }] : []),
     ...(can('bulk_upload.create') ? [{ key: 'students', label: 'Students', children: <StudentsUpload /> }] : []),
     ...(can('staff.create') ? [{ key: 'staff', label: 'Staff', children: <StaffUpload /> }] : []),
     ...(can('student_skill.create') ? [{ key: 'skills', label: 'Student skills', children: <SkillsUpload /> }] : []),

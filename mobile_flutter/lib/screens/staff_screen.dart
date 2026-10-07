@@ -8,17 +8,52 @@ import '../auth/session.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/files.dart';
+import '../widgets/import_upload.dart';
 import '../widgets/pickers.dart';
 
 /// The staff directory, with their department, roles and subject allocations.
-class StaffScreen extends StatefulWidget {
+class StaffScreen extends StatelessWidget {
   const StaffScreen({super.key});
 
   @override
-  State<StaffScreen> createState() => _StaffScreenState();
+  Widget build(BuildContext context) {
+    final session = context.watch<Session>();
+    final showImport = session.can(['staff.create']);
+    if (!showImport) return const _StaffList();
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: const TabBar(tabs: [Tab(text: 'List'), Tab(text: 'Import')]),
+        body: TabBarView(
+          children: [
+            const _StaffList(),
+            ListView(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+              children: [
+                ImportUpload(
+                  title: 'staff',
+                  hint: 'One row per staff member: employee code, name, department code, designation and roles.',
+                  upload: (file, {required dryRun}) => bulkApi.staff(file, dryRun: dryRun),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _StaffScreenState extends State<StaffScreen> {
+class _StaffList extends StatefulWidget {
+  const _StaffList();
+
+  @override
+  State<_StaffList> createState() => _StaffListState();
+}
+
+class _StaffListState extends State<_StaffList> {
   String _search = '';
   int? _departmentId;
   int _reload = 0;

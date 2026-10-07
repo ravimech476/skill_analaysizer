@@ -4,18 +4,17 @@ import { CheckCircleTwoTone, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { errorMessage } from '../api/client';
-import { placementApi, pretty, type Skill, type StudentSkill } from '../api/placement';
+import { placementApi, pretty, type StudentSkill } from '../api/placement';
 import { scoresApi } from '../api/careers';
 import { studentsApi } from '../api/phase2';
 import { useClasses } from '../api/lookups';
 import { useAuth } from '../auth/AuthContext';
 import { audienceOf } from '../auth/access';
-import MasterCrud from '../components/MasterCrud';
-import { ScoreBadge, ScoringWeights, SubjectSkillMapping, useSkillScores } from '../components/SkillScoring';
+import { ScoreBadge, useSkillScores } from '../components/SkillScoring';
 import type { FileLink, UploadedFile } from '../api/files';
 import { FileAnchor, UploadButton } from '../components/Files';
+import { SkillsUpload as SkillsUploadTab } from './BulkUploadPage';
 
-const CATEGORIES = ['programming', 'framework', 'database', 'tool', 'technical', 'soft_skill', 'domain'].map((c) => ({ value: c, label: pretty(c) }));
 const SOURCES = ['assessment', 'certification', 'project', 'internship', 'course'].map((s) => ({ value: s, label: pretty(s) }));
 const CATEGORY_COLORS: Record<string, string> = { programming: 'blue', framework: 'geekblue', database: 'cyan', tool: 'purple', technical: 'volcano', soft_skill: 'green', domain: 'gold' };
 export const LEVELS = ['', 'Beginner', 'Basic', 'Intermediate', 'Advanced', 'Expert'];
@@ -250,26 +249,6 @@ function ClassSkills() {
   );
 }
 
-function SkillMaster() {
-  return (
-    <MasterCrud<Skill>
-      path="skills"
-      perm="skill"
-      noun="skill"
-      fields={[
-        { name: 'name', label: 'Skill name', type: 'text', required: true },
-        { name: 'category', label: 'Category', type: 'select', options: CATEGORIES },
-      ]}
-      columns={[
-        { title: 'Skill', dataIndex: 'name' },
-        { title: 'Category', dataIndex: 'category', width: 140, render: (v) => <Tag color={CATEGORY_COLORS[v]}>{pretty(v)}</Tag> },
-        { title: 'Students', dataIndex: 'student_count', width: 100 },
-        { title: 'Job roles', dataIndex: 'job_role_count', width: 100 },
-      ]}
-    />
-  );
-}
-
 function OwnOrChildSkills({ parent }: { parent: boolean }) {
   const { data, isLoading } = useQuery({ queryKey: ['students', parent ? 'children' : 'mine'], queryFn: () => studentsApi.list({ page: 1, page_size: parent ? 50 : 1 }) });
   const [selected, setSelected] = useState<number>();
@@ -298,9 +277,7 @@ export default function SkillsPage() {
       <Tabs
         items={[
           { key: 'class', label: 'By class', children: <ClassSkills /> },
-          ...(can('skill.view') ? [{ key: 'master', label: 'Skill list', children: <SkillMaster /> }] : []),
-          ...(can('subject.view') ? [{ key: 'subjects', label: 'Subject → skills', children: <SubjectSkillMapping /> }] : []),
-          ...(can('config.view') ? [{ key: 'scoring', label: 'Scoring weights', children: <ScoringWeights /> }] : []),
+          ...(can('student_skill.create') ? [{ key: 'import', label: 'Import', children: <SkillsUploadTab /> }] : []),
         ]}
       />
     </Card>

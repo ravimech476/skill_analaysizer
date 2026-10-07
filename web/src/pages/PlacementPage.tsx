@@ -7,19 +7,16 @@ import {
   Col,
   DatePicker,
   Descriptions,
-  Drawer,
   Empty,
   Form,
   Input,
   InputNumber,
-  List,
   Modal,
   Progress,
   Row,
   Select,
   Space,
   Spin,
-  Statistic,
   Switch,
   Table,
   Tabs,
@@ -27,13 +24,11 @@ import {
   Typography,
   message,
 } from 'antd';
-import { DownloadOutlined, MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { filesApi, fileUrl } from '../api/files';
 import { FileAnchor, FileSlot } from '../components/Files';
-import { exportsApi } from '../api/reports';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
 import { errorMessage } from '../api/client';
 import {
   lpa,
@@ -42,9 +37,9 @@ import {
   STATUS_COLORS,
   type AppStatus,
   type Application,
-  type Company,
   type JobRole,
   type JobRoleInput,
+  type Match,
   type Opportunity,
   type RoleStatus,
 } from '../api/placement';
@@ -52,8 +47,8 @@ import { studentsApi } from '../api/phase2';
 import { useDepartments } from '../api/lookups';
 import { useAuth } from '../auth/AuthContext';
 import { audienceOf } from '../auth/access';
-import MasterCrud from '../components/MasterCrud';
 import { useSkills } from './SkillsPage';
+import { PlacementDrivesUpload } from './BulkUploadPage';
 
 const ROLE_STATUSES: RoleStatus[] = ['upcoming', 'open', 'closed', 'completed'];
 const APP_STATUSES: AppStatus[] = ['shortlisted', 'applied', 'in_process', 'selected', 'rejected', 'withdrawn'];
@@ -103,12 +98,18 @@ function JobRoleDrawer({ role, open, onClose }: { role: JobRole | null; open: bo
   });
 
   return (
-    <Drawer
+    <Modal
       title={role ? `Edit ${role.title}` : 'New job role / drive'}
       open={open}
-      onClose={onClose}
-      size={Math.min(640, window.innerWidth)}
+      onCancel={onClose}
+      width={720}
+      centered
       forceRender
+      styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none' } }}
+      footer={[
+        <Button key="cancel" onClick={onClose}>Cancel</Button>,
+        <Button key="save" type="primary" loading={save.isPending} onClick={() => form.submit()}>Save</Button>,
+      ]}
       afterOpenChange={(o) => {
         if (!o) return;
         setError(undefined);
@@ -125,7 +126,6 @@ function JobRoleDrawer({ role, open, onClose }: { role: JobRole | null; open: bo
             : { status: 'upcoming', min_cgpa: 6, max_backlogs: 0, skills: [{ required_level: 3, weight: 1, is_mandatory: true }] },
         );
       }}
-      extra={<Button type="primary" loading={save.isPending} onClick={() => form.submit()}>Save</Button>}
     >
       {error && <Alert type="error" title={error} showIcon style={{ marginBottom: 16 }} />}
       <Form form={form} layout="vertical" onFinish={(v) => save.mutate(v)} requiredMark="optional">
@@ -197,31 +197,21 @@ function JobRoleDrawer({ role, open, onClose }: { role: JobRole | null; open: bo
           {(fields, { add, remove }) => (
             <>
               {fields.map((f) => (
-                <Row gutter={8} key={f.key} align="middle">
-                  <Col xs={24} sm={9}>
-                    <Form.Item name={[f.name, 'skill_id']} rules={[{ required: true, message: 'Skill' }]}>
-                      <Select showSearch optionFilterProp="label" placeholder="Skill" options={(skills ?? []).map((s) => ({ value: s.id, label: s.name }))} />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={8} sm={5}>
-                    <Form.Item name={[f.name, 'required_level']} rules={[{ required: true }]}>
-                      <Select options={[1, 2, 3, 4, 5].map((n) => ({ value: n, label: `Level ${n}` }))} />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={7} sm={4}>
-                    <Form.Item name={[f.name, 'weight']}>
-                      <Select options={[1, 2, 3].map((n) => ({ value: n, label: `×${n}` }))} />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={7} sm={5}>
-                    <Form.Item name={[f.name, 'is_mandatory']} valuePropName="checked">
-                      <Switch checkedChildren="Must" unCheckedChildren="Nice" />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={2} sm={1}>
-                    <Button type="text" icon={<MinusCircleOutlined />} onClick={() => remove(f.name)} aria-label="Remove skill" style={{ marginBottom: 24 }} />
-                  </Col>
-                </Row>
+                <div key={f.key} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 4 }}>
+                  <Form.Item name={[f.name, 'skill_id']} rules={[{ required: true, message: 'Skill' }]} style={{ flex: '1 1 160px', marginBottom: 8 }}>
+                    <Select showSearch optionFilterProp="label" placeholder="Skill" options={(skills ?? []).map((s) => ({ value: s.id, label: s.name }))} />
+                  </Form.Item>
+                  <Form.Item name={[f.name, 'required_level']} rules={[{ required: true }]} style={{ flex: '0 0 90px', marginBottom: 8 }}>
+                    <Select options={[1, 2, 3, 4, 5].map((n) => ({ value: n, label: `Lv ${n}` }))} />
+                  </Form.Item>
+                  <Form.Item name={[f.name, 'weight']} style={{ flex: '0 0 65px', marginBottom: 8 }}>
+                    <Select options={[1, 2, 3].map((n) => ({ value: n, label: `×${n}` }))} />
+                  </Form.Item>
+                  <Form.Item name={[f.name, 'is_mandatory']} valuePropName="checked" style={{ flex: '0 0 auto', marginBottom: 8 }}>
+                    <Switch checkedChildren="Must" unCheckedChildren="Nice" />
+                  </Form.Item>
+                  <Button type="text" icon={<MinusCircleOutlined />} onClick={() => remove(f.name)} aria-label="Remove skill" style={{ marginTop: 4 }} />
+                </div>
               ))}
               <Button type="dashed" icon={<PlusOutlined />} onClick={() => add({ required_level: 3, weight: 1, is_mandatory: false })}>
                 Add skill
@@ -233,7 +223,7 @@ function JobRoleDrawer({ role, open, onClose }: { role: JobRole | null; open: bo
           <Input.TextArea rows={3} />
         </Form.Item>
       </Form>
-    </Drawer>
+    </Modal>
   );
 }
 
@@ -242,9 +232,24 @@ function JobRoleDrawer({ role, open, onClose }: { role: JobRole | null; open: bo
 function RoleDetail({ roleId, onEdit, onClose }: { roleId: number; onEdit: (r: JobRole) => void; onClose: () => void }) {
   const { can } = useAuth();
   const qc = useQueryClient();
-  const navigate = useNavigate();
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const { data: role } = useQuery({ queryKey: ['job-roles', 'detail', roleId], queryFn: () => placementApi.role(roleId) });
   const { data: apps, isFetching } = useQuery({ queryKey: ['job-roles', 'apps', roleId], queryFn: () => placementApi.applications(roleId) });
+  const { data: eligibleData, isLoading: loadingEligible, refetch: refetchEligible } = useQuery({
+    queryKey: ['job-roles', 'eligible', roleId],
+    queryFn: () => placementApi.analyze(roleId),
+    enabled: role?.status === 'open' || role?.status === 'upcoming',
+  });
+  const shortlistMut = useMutation({
+    mutationFn: () => placementApi.shortlist(roleId, selectedIds),
+    onSuccess: (r) => {
+      message.success(`Shortlisted ${r.added} students`);
+      setSelectedIds([]);
+      qc.invalidateQueries({ queryKey: ['job-roles'] });
+      refetchEligible();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
 
   const setStatus = useMutation({
     mutationFn: (s: RoleStatus) => placementApi.setRoleStatus(roleId, s),
@@ -271,6 +276,17 @@ function RoleDetail({ roleId, onEdit, onClose }: { roleId: number; onEdit: (r: J
   });
 
   if (!role) return <Spin />;
+
+  const eligibleStudents = eligibleData?.matches?.filter((m) => m.is_eligible) ?? [];
+  const byDept: Record<string, Record<string, Match[]>> = {};
+  for (const m of eligibleStudents) {
+    const dept = m.department_code ?? 'Unknown';
+    const cls = m.class_label ?? 'Unassigned';
+    if (!byDept[dept]) byDept[dept] = {};
+    if (!byDept[dept][cls]) byDept[dept][cls] = [];
+    byDept[dept][cls].push(m);
+  }
+
   return (
     <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <Descriptions
@@ -325,13 +341,101 @@ function RoleDetail({ roleId, onEdit, onClose }: { roleId: number; onEdit: (r: J
           />
         </Descriptions.Item>
       </Descriptions>
+      {(role.status === 'open' || role.status === 'upcoming') && (
+        <div>
+          <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              Eligible Students ({eligibleData?.eligible ?? 0} of {eligibleData?.total ?? 0})
+            </Typography.Title>
+            {selectedIds.length > 0 && can('placement.create') && (
+              <Space>
+                <Typography.Text type="secondary">{selectedIds.length} selected</Typography.Text>
+                <Button type="primary" loading={shortlistMut.isPending}
+                  onClick={() => shortlistMut.mutate()}>
+                  Shortlist &amp; Notify ({selectedIds.length})
+                </Button>
+              </Space>
+            )}
+          </Space>
+          {loadingEligible ? <Spin /> : (
+            Object.entries(byDept).map(([dept, byClass]) => {
+              const deptStudents = Object.values(byClass).flat();
+              const selectableDept = deptStudents.filter((m) => m.application_status == null).map((m) => m.student_id);
+              const allDeptSelected = selectableDept.length > 0 && selectableDept.every((id) => selectedIds.includes(id));
+              return (
+              <Card key={dept} size="small" title={
+                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <span>Department: {dept} ({deptStudents.length} eligible)</span>
+                  {can('placement.create') && selectableDept.length > 0 && (
+                    <Button size="small" type={allDeptSelected ? 'default' : 'link'}
+                      onClick={() => {
+                        if (allDeptSelected) {
+                          setSelectedIds((prev) => prev.filter((id) => !selectableDept.includes(id)));
+                        } else {
+                          setSelectedIds((prev) => [...new Set([...prev, ...selectableDept])]);
+                        }
+                      }}>
+                      {allDeptSelected ? `Deselect all ${dept}` : `Select all ${dept}`}
+                    </Button>
+                  )}
+                </Space>
+              } style={{ marginBottom: 12 }}>
+                {Object.entries(byClass).map(([cls, students]) => {
+                  const selectableCls = students.filter((m) => m.application_status == null).map((m) => m.student_id);
+                  const allClsSelected = selectableCls.length > 0 && selectableCls.every((id) => selectedIds.includes(id));
+                  return (
+                  <div key={cls} style={{ marginBottom: 16 }}>
+                    <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Typography.Text strong>{cls} ({students.length} eligible)</Typography.Text>
+                      {can('placement.create') && selectableCls.length > 0 && (
+                        <Button size="small" type={allClsSelected ? 'default' : 'link'}
+                          onClick={() => {
+                            if (allClsSelected) {
+                              setSelectedIds((prev) => prev.filter((id) => !selectableCls.includes(id)));
+                            } else {
+                              setSelectedIds((prev) => [...new Set([...prev, ...selectableCls])]);
+                            }
+                          }}>
+                          {allClsSelected ? 'Deselect all' : 'Select all'}
+                        </Button>
+                      )}
+                    </Space>
+                    <Table<Match>
+                      rowKey="student_id"
+                      size="small"
+                      pagination={false}
+                      rowSelection={can('placement.create') ? {
+                        selectedRowKeys: selectedIds,
+                        onChange: (keys) => setSelectedIds(keys as number[]),
+                        getCheckboxProps: (r) => ({ disabled: r.application_status != null }),
+                      } : undefined}
+                      dataSource={students}
+                      columns={[
+                        { title: 'Student', render: (_, m) => <span>{m.name} <Typography.Text type="secondary">{m.register_no}</Typography.Text></span> },
+                        { title: 'CGPA', dataIndex: 'cgpa', width: 70, render: (v: number) => v?.toFixed(2) },
+                        { title: 'Skills', render: (_, m) => (
+                          <Space size={4} wrap>
+                            {(m.matched_skills ?? []).map((s) => <Tag key={s.skill_id} color="green">{s.name}</Tag>)}
+                            {(m.missing_skills ?? []).map((s) => <Tag key={s.skill_id} color="red">{s.name}</Tag>)}
+                          </Space>
+                        )},
+                        { title: 'Status', render: (_, m) => m.application_status ? <Tag color="blue">{m.application_status}</Tag> : null, width: 100 },
+                      ]}
+                    />
+                  </div>
+                  );
+                })}
+              </Card>
+              );
+            })
+          )}
+          {!loadingEligible && eligibleStudents.length === 0 && <Empty description="No eligible students for this drive" />}
+        </div>
+      )}
       <div>
-        <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
-          <Typography.Title level={5} style={{ margin: 0 }}>
-            Applications ({apps?.length ?? 0})
-          </Typography.Title>
-          {can('skill_analyzer.view') && <Button type="primary" onClick={() => navigate(`/skill-analyzer?role=${roleId}`)}>Rank &amp; shortlist students</Button>}
-        </Space>
+        <Typography.Title level={5} style={{ margin: 0, marginBottom: 8 }}>
+          Applications ({apps?.length ?? 0})
+        </Typography.Title>
         <Table<Application>
           rowKey="id"
           size="small"
@@ -339,7 +443,7 @@ function RoleDetail({ roleId, onEdit, onClose }: { roleId: number; onEdit: (r: J
           dataSource={apps}
           pagination={false}
           scroll={{ x: 640 }}
-          locale={{ emptyText: 'No one shortlisted yet. Use the skill analyzer to rank and shortlist students.' }}
+          locale={{ emptyText: 'No applications yet.' }}
           columns={[
             { title: 'Student', render: (_, a) => <span>{a.student_name} <Typography.Text type="secondary">{a.register_no}</Typography.Text></span> },
             { title: 'Dept', dataIndex: 'department_code', width: 80 },
@@ -371,6 +475,7 @@ function RoleDetail({ roleId, onEdit, onClose }: { roleId: number; onEdit: (r: J
 
 function Drives() {
   const { can } = useAuth();
+  const qc = useQueryClient();
   const [status, setStatus] = useState<string>();
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<{ open: boolean; role: JobRole | null }>({ open: false, role: null });
@@ -395,133 +500,44 @@ function Drives() {
         loading={isLoading}
         dataSource={data}
         pagination={{ pageSize: 20, hideOnSinglePage: true }}
-        scroll={{ x: 1040 }}
+        scroll={{ x: 1100 }}
         onRow={(r) => ({ onClick: () => setViewing(r.id), style: { cursor: 'pointer' } })}
         columns={[
           { title: 'Role', width: 230, render: (_, r) => <div><Typography.Text strong>{r.title}</Typography.Text><br /><Typography.Text type="secondary">{r.company_name}</Typography.Text></div> },
-          { title: 'Package', dataIndex: 'package_lpa', width: 110, render: (v) => lpa(v) },
-          { title: 'Drive', dataIndex: 'drive_date', width: 110, render: (v) => (v ? dayjs(v).format('DD MMM YY') : '—') },
-          { title: 'Eligibility', width: 150, render: (_, r) => <Typography.Text type="secondary">CGPA ≥ {r.min_cgpa} · ≤ {r.max_backlogs} backlogs</Typography.Text> },
-          { title: 'Skills', width: 300, render: (_, r) => <RoleSkillsTags role={r} /> },
-          { title: 'Applied / placed', width: 130, render: (_, r) => `${r.application_count} / ${r.selected_count}` },
-          { title: 'Status', dataIndex: 'status', width: 110, render: (v) => <Tag color={STATUS_COLORS[v]}>{pretty(v)}</Tag> },
+          { title: 'Package', dataIndex: 'package_lpa', width: 100, render: (v) => lpa(v) },
+          { title: 'Drive', dataIndex: 'drive_date', width: 100, render: (v) => (v ? dayjs(v).format('DD MMM YY') : '—') },
+          { title: 'Skills', width: 250, render: (_, r) => <RoleSkillsTags role={r} /> },
+          { title: 'Applied', width: 80, render: (_, r) => r.application_count },
+          { title: 'Status', dataIndex: 'status', width: 100, render: (v) => <Tag color={STATUS_COLORS[v]}>{pretty(v)}</Tag> },
+          ...(can('job_role.update') || can('job_role.delete') ? [{
+            title: 'Actions',
+            width: 140,
+            render: (_: any, r: JobRole) => (
+              <Space size={4} onClick={(e) => e.stopPropagation()}>
+                {can('job_role.update') && <Button size="small" onClick={() => setForm({ open: true, role: r })}>Edit</Button>}
+                {can('job_role.delete') && <Button size="small" danger onClick={() => Modal.confirm({
+                  title: `Delete "${r.title}"?`,
+                  content: `This will remove the ${r.company_name} drive permanently.`,
+                  okButtonProps: { danger: true },
+                  onOk: () => placementApi.deleteRole(r.id).then(() => {
+                    message.success('Drive deleted');
+                    qc.invalidateQueries({ queryKey: ['job-roles'] });
+                  }),
+                })}>Delete</Button>}
+              </Space>
+            ),
+          }] : []),
         ]}
       />
       <JobRoleDrawer open={form.open} role={form.role} onClose={() => setForm({ open: false, role: null })} />
-      <Drawer title="Job role" open={viewing !== null} onClose={() => setViewing(null)} size={Math.min(860, window.innerWidth)} destroyOnHidden>
-        {viewing !== null && <RoleDetail roleId={viewing} onEdit={(r) => setForm({ open: true, role: r })} onClose={() => setViewing(null)} />}
-      </Drawer>
+      <Modal title="Job role" open={viewing !== null} onCancel={() => setViewing(null)} width={900} centered footer={null} destroyOnHidden
+        styles={{ body: { maxHeight: 'calc(100vh - 180px)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none' } }}>
+        {viewing !== null && <RoleDetail roleId={viewing} onEdit={(r) => { setViewing(null); setForm({ open: true, role: r }); }} onClose={() => setViewing(null)} />}
+      </Modal>
     </>
   );
 }
 
-function Placed() {
-  const { can } = useAuth();
-  const qc = useQueryClient();
-  const [batch, setBatch] = useState<string>();
-  const [search, setSearch] = useState('');
-  const { data: stats } = useQuery({ queryKey: ['placements', 'stats', batch], queryFn: () => placementApi.stats(batch) });
-  const { data: list, isFetching } = useQuery({ queryKey: ['placements', batch, search], queryFn: () => placementApi.placements({ batch, search }) });
-
-  return (
-    <>
-      <Space wrap style={{ marginBottom: 16 }}>
-        <Input placeholder="Batch e.g. 2025-2029" allowClear style={{ width: 200 }} onPressEnter={(e) => setBatch((e.target as HTMLInputElement).value || undefined)} onChange={(e) => !e.target.value && setBatch(undefined)} />
-        <Input.Search allowClear placeholder="Student or company" style={{ width: 240 }} onSearch={setSearch} />
-        <Button icon={<DownloadOutlined />} onClick={() => exportsApi.placements({ batch, search: search || undefined })}>
-          Placement report (.xlsx)
-        </Button>
-      </Space>
-      {stats && (
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Placed" value={stats.placed_percent} suffix="%" /><Typography.Text type="secondary">{stats.placed_students} of {stats.total_students} students</Typography.Text></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Offers" value={stats.total_offers} /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Highest" value={stats.highest_package ?? 0} suffix="LPA" /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Average (best offer)" value={stats.average_package ?? 0} suffix="LPA" /></Card></Col>
-          <Col xs={24} lg={12}>
-            <Card size="small" title="By department">
-              <List
-                size="small"
-                dataSource={stats.by_department}
-                renderItem={(d) => (
-                  <List.Item>
-                    <div style={{ width: '100%' }}>
-                      <Space style={{ width: '100%', justifyContent: 'space-between' }}><span><b>{d.code}</b> {d.name}</span><span>{d.placed}/{d.students}</span></Space>
-                      <Progress percent={d.percent} size="small" />
-                    </div>
-                  </List.Item>
-                )}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} lg={12}>
-            <Card size="small" title="By company">
-              <Table size="small" rowKey="company" pagination={false} dataSource={stats.by_company} locale={{ emptyText: 'No placements yet' }}
-                columns={[{ title: 'Company', dataIndex: 'company' }, { title: 'Offers', dataIndex: 'offers', width: 80 }, { title: 'Highest', dataIndex: 'highest', width: 110, render: (v) => lpa(v) }]} />
-            </Card>
-          </Col>
-        </Row>
-      )}
-      <Table
-        rowKey="id"
-        size="small"
-        loading={isFetching}
-        dataSource={list}
-        pagination={{ pageSize: 25, hideOnSinglePage: true }}
-        scroll={{ x: 760 }}
-        columns={[
-          { title: 'Student', render: (_, p) => <span>{p.student_name} <Typography.Text type="secondary">{p.register_no}</Typography.Text></span> },
-          { title: 'Dept', dataIndex: 'department_code', width: 80 },
-          { title: 'Batch', dataIndex: 'batch', width: 110 },
-          { title: 'Company', dataIndex: 'company_name' },
-          { title: 'Role', dataIndex: 'job_title', width: 180 },
-          { title: 'Package', dataIndex: 'package_lpa', width: 110, render: (v) => lpa(v) },
-          { title: 'Offer date', dataIndex: 'offer_date', width: 110, render: (v) => (v ? dayjs(v).format('DD MMM YY') : '—') },
-          {
-            title: 'Offer letter',
-            width: 200,
-            render: (_, p) => (
-              <FileSlot
-                category="offer_letter"
-                value={p.offer_letter}
-                canEdit={can('placement.update')}
-                emptyText="—"
-                save={(fid) => filesApi.setOfferLetter(p.id, fid).then(() => qc.invalidateQueries({ queryKey: ['placements'] }))}
-              />
-            ),
-          },
-        ]}
-      />
-    </>
-  );
-}
-
-function Companies() {
-  return (
-    <MasterCrud<Company>
-      path="companies"
-      perm="company"
-      noun="company"
-      fields={[
-        { name: 'name', label: 'Company name', type: 'text', required: true },
-        { name: 'industry', label: 'Industry', type: 'text' },
-        { name: 'location', label: 'Location', type: 'text' },
-        { name: 'website', label: 'Website', type: 'text' },
-        { name: 'contact_person', label: 'Contact person', type: 'text' },
-        { name: 'contact_email', label: 'Contact email', type: 'text' },
-        { name: 'contact_mobile', label: 'Contact mobile', type: 'text' },
-        { name: 'description', label: 'About', type: 'text' },
-      ]}
-      columns={[
-        { title: 'Company', dataIndex: 'name', render: (v, c) => <div><b>{v}</b><br /><Typography.Text type="secondary">{[c.industry, c.location].filter(Boolean).join(' · ')}</Typography.Text></div> },
-        { title: 'Contact', render: (_, c) => [c.contact_person, c.contact_mobile].filter(Boolean).join(' · ') || '—' },
-        { title: 'Roles', dataIndex: 'job_role_count', width: 80 },
-        { title: 'Placed', dataIndex: 'placed_count', width: 80 },
-        { title: 'Highest', dataIndex: 'highest_package', width: 110, render: (v) => lpa(v) },
-      ]}
-    />
-  );
-}
 
 // ---------- student / parent view ----------
 
@@ -635,13 +651,10 @@ export default function PlacementPage() {
   }
   return (
     <Card>
-      <Tabs
-        items={[
-          { key: 'drives', label: 'Drives & job roles', children: <Drives /> },
-          { key: 'placed', label: 'Placements', children: <Placed /> },
-          ...(can('company.view') ? [{ key: 'companies', label: 'Companies', children: <Companies /> }] : []),
-        ]}
-      />
+      <Tabs items={[
+        { key: 'drives', label: 'Drives', children: <Drives /> },
+        ...(can('job_role.create') ? [{ key: 'import', label: 'Import', children: <PlacementDrivesUpload /> }] : []),
+      ]} />
     </Card>
   );
 }

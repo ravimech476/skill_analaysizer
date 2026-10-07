@@ -10,6 +10,7 @@ import '../main.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/files.dart';
+import '../widgets/import_upload.dart';
 import '../widgets/pickers.dart';
 import 'student_detail_screen.dart';
 
@@ -17,14 +18,78 @@ export 'student_detail_screen.dart' show StudentDetailScreen;
 
 /// Staff see a searchable roster; a student sees their own profile and a parent
 /// sees their children, which is the same list with a different shape.
-class StudentsScreen extends StatefulWidget {
+class StudentsScreen extends StatelessWidget {
   const StudentsScreen({super.key});
 
   @override
-  State<StudentsScreen> createState() => _StudentsScreenState();
+  Widget build(BuildContext context) {
+    final session = context.watch<Session>();
+    final showImport = session.isStaff && session.can(['bulk_upload.create']);
+    if (!showImport) return const _StudentsList();
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: const TabBar(tabs: [Tab(text: 'List'), Tab(text: 'Import')]),
+        body: TabBarView(
+          children: [
+            const _StudentsList(),
+            _StudentsImport(),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _StudentsScreenState extends State<StudentsScreen> {
+class _StudentsImport extends StatefulWidget {
+  @override
+  State<_StudentsImport> createState() => _StudentsImportState();
+}
+
+class _StudentsImportState extends State<_StudentsImport> {
+  bool _createClasses = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+      children: [
+        ImportUpload(
+          title: 'students',
+          hint: 'One row per student: register number, name, department code, class and optional parent details.',
+          upload: (file, {required dryRun}) =>
+              bulkApi.students(file, dryRun: dryRun, createMissingClasses: _createClasses),
+          extraControls: (busy) => SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _createClasses,
+            activeThumbColor: Brand.accent,
+            title: const Text('Create missing classes', style: TextStyle(fontSize: 14)),
+            onChanged: (v) => setState(() => _createClasses = v),
+          ),
+        ),
+        const SizedBox(height: 24),
+        const Text('Import Student Skills', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+        const SizedBox(height: 8),
+        ImportUpload(
+          title: 'Student Skills',
+          hint: 'One row per student+skill: register_no, skill_name, proficiency (1-5).',
+          upload: (file, {required dryRun}) => bulkApi.skills(file, dryRun: dryRun),
+        ),
+      ],
+    );
+  }
+}
+
+class _StudentsList extends StatefulWidget {
+  const _StudentsList();
+
+  @override
+  State<_StudentsList> createState() => _StudentsListState();
+}
+
+class _StudentsListState extends State<_StudentsList> {
   String _search = '';
   int? _departmentId;
   int? _classId;
@@ -294,7 +359,44 @@ class _StudentFormState extends State<_StudentForm> {
 
   // Parents are only collected when creating; afterwards they are managed on the detail screen.
   final List<Map<String, String>> _parents = [];
+
+  // Skills: list of {name, proficiency} maps; autocomplete options loaded on init.
+  final List<Map<String, dynamic>> _skills = [];
+  List<String> _allSkillNames = [];
+
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSkillNames();
+    if (widget.student != null) _loadStudentSkills();
+  }
+
+  Future<void> _loadSkillNames() async {
+    try {
+      final refs = await Lookups.skills();
+      if (mounted) setState(() => _allSkillNames = refs.map((r) => r.label).toList());
+    } catch (_) {
+      // Skill autocomplete is best-effort; the form works without it.
+    }
+  }
+
+  Future<void> _loadStudentSkills() async {
+    try {
+      final skills = await skillsApi.of(widget.student!.id);
+      if (mounted) {
+        setState(() {
+          _skills.addAll(skills.map((s) => <String, dynamic>{
+                'name': s.name,
+                'proficiency': s.proficiency,
+              }));
+        });
+      }
+    } catch (_) {
+      // If the student has no skills yet, that is fine.
+    }
+  }
 
   @override
   void dispose() {
@@ -329,6 +431,10 @@ class _StudentFormState extends State<_StudentForm> {
             .where((p) => (p['name'] ?? '').isNotEmpty && (p['mobile'] ?? '').isNotEmpty)
             .map((p) => {'name': p['name'], 'mobile': p['mobile'], 'relation': p['relation'] ?? 'father'})
             .toList(),
+      'skills': _skills
+          .where((s) => (s['name']?.toString().trim() ?? '').isNotEmpty)
+          .map((s) => {'name': s['name'], 'proficiency': s['proficiency'] ?? 3})
+          .toList(),
     };
     try {
       if (widget.student == null) {
@@ -472,6 +578,67 @@ class _StudentFormState extends State<_StudentForm> {
             );
           }),
         ],
+        const Divider(height: 28),
+        Row(
+          children: [
+            const Expanded(
+              child: Text('Skills', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+            TextButton.icon(
+              onPressed: () => setState(() => _skills.add({'name': '', 'proficiency': 3})),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add'),
+            ),
+          ],
+        ),
+        const Text(
+          'Type a skill name or pick from the list. New names are created automatically.',
+          style: TextStyle(fontSize: 12, color: Brand.muted),
+        ),
+        const SizedBox(height: 10),
+        ..._skills.asMap().entries.map((entry) {
+          final i = entry.key;
+          final sk = entry.value;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Autocomplete<String>(
+                    initialValue: TextEditingValue(text: sk['name'] ?? ''),
+                    optionsBuilder: (v) {
+                      if (v.text.isEmpty) return _allSkillNames;
+                      final lower = v.text.toLowerCase();
+                      return _allSkillNames.where((s) => s.toLowerCase().contains(lower));
+                    },
+                    onSelected: (v) => _skills[i]['name'] = v,
+                    fieldViewBuilder: (ctx, ctrl, fn, onSubmit) {
+                      if (ctrl.text.isEmpty && (sk['name'] ?? '').isNotEmpty) {
+                        ctrl.text = sk['name'];
+                      }
+                      return TextField(
+                        controller: ctrl,
+                        focusNode: fn,
+                        decoration: const InputDecoration(hintText: 'Type or pick skill', isDense: true),
+                        onChanged: (v) => _skills[i]['name'] = v,
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                DropdownButton<int>(
+                  value: (sk['proficiency'] as int?) ?? 3,
+                  items: List.generate(5, (j) => DropdownMenuItem(value: j + 1, child: Text('${j + 1}'))),
+                  onChanged: (v) => setState(() => _skills[i]['proficiency'] = v),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () => setState(() => _skills.removeAt(i)),
+                ),
+              ],
+            ),
+          );
+        }),
         const SizedBox(height: 10),
         FilledButton(
           onPressed: _busy ? null : _save,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Button, Card, DatePicker, Drawer, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, DatePicker, Drawer, Form, Input, Modal, Select, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -9,6 +9,7 @@ import { useDepartments } from '../api/lookups';
 import { useAuth } from '../auth/AuthContext';
 import { ROLE_COLORS } from '../auth/access';
 import { UserAvatar } from '../components/Files';
+import { StaffUpload as StaffUploadTab } from './BulkUploadPage';
 
 const STAFF_ROLES = [
   { value: 'staff', label: 'Staff' },
@@ -120,7 +121,7 @@ function StaffDrawer({ row, open, onClose }: { row: Staff | null; open: boolean;
   );
 }
 
-export default function StaffPage() {
+function StaffList() {
   const { can, user } = useAuth();
   const qc = useQueryClient();
   const { data: depts } = useDepartments();
@@ -136,27 +137,25 @@ export default function StaffPage() {
   });
 
   return (
-    <Card
-      title={<span style={{ fontWeight: 600 }}>{data?.meta.total ?? 0} staff members</span>}
-      extra={
-        can('staff.create') && (
+    <>
+      <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+        <Space wrap>
+          <Input.Search allowClear placeholder="Name, employee code, mobile" style={{ width: 260 }} onSearch={(search) => setFilter((f) => ({ ...f, search, page: 1 }))} />
+          <Select allowClear placeholder="All departments" style={{ width: 220 }} options={(depts ?? []).map((d) => ({ value: d.id, label: `${d.code} · ${d.name}` }))} onChange={(department_id) => setFilter((f) => ({ ...f, department_id, page: 1 }))} />
+          <Select allowClear placeholder="All roles" style={{ width: 180 }} options={STAFF_ROLES} onChange={(role) => setFilter((f) => ({ ...f, role, page: 1 }))} />
+          {can('staff.delete') && (
+            <Select
+              style={{ width: 130 }}
+              defaultValue="active"
+              options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }, { value: 'all', label: 'All' }]}
+              onChange={(status) => setFilter((f) => ({ ...f, status, page: 1 }))}
+            />
+          )}
+        </Space>
+        {can('staff.create') && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setDrawer({ open: true, row: null })}>
             New staff
           </Button>
-        )
-      }
-    >
-      <Space wrap style={{ marginBottom: 16 }}>
-        <Input.Search allowClear placeholder="Name, employee code, mobile" style={{ width: 260 }} onSearch={(search) => setFilter((f) => ({ ...f, search, page: 1 }))} />
-        <Select allowClear placeholder="All departments" style={{ width: 220 }} options={(depts ?? []).map((d) => ({ value: d.id, label: `${d.code} · ${d.name}` }))} onChange={(department_id) => setFilter((f) => ({ ...f, department_id, page: 1 }))} />
-        <Select allowClear placeholder="All roles" style={{ width: 180 }} options={STAFF_ROLES} onChange={(role) => setFilter((f) => ({ ...f, role, page: 1 }))} />
-        {can('staff.delete') && (
-          <Select
-            style={{ width: 130 }}
-            defaultValue="active"
-            options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }, { value: 'all', label: 'All' }]}
-            onChange={(status) => setFilter((f) => ({ ...f, status, page: 1 }))}
-          />
         )}
       </Space>
       <Table<Staff>
@@ -222,6 +221,20 @@ export default function StaffPage() {
         ]}
       />
       <StaffDrawer open={drawer.open} row={drawer.row} onClose={() => setDrawer({ open: false, row: null })} />
+    </>
+  );
+}
+
+export default function StaffPage() {
+  const { can } = useAuth();
+  return (
+    <Card>
+      <Tabs
+        items={[
+          { key: 'list', label: 'Staff List', children: <StaffList /> },
+          ...(can('staff.create') ? [{ key: 'import', label: 'Import', children: <StaffUploadTab /> }] : []),
+        ]}
+      />
     </Card>
   );
 }

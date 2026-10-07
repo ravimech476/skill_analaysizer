@@ -213,6 +213,7 @@ export interface StudentInput {
   blood_group?: string | null;
   address?: string | null;
   parents?: ParentInput[];
+  skills?: { name: string; proficiency: number }[];
 }
 
 export interface ParentListItem {
@@ -312,6 +313,55 @@ export const bulkApi = {
     api.get<ListEnvelope<UploadJob>>('/bulk-upload/jobs', { params: { page, page_size, upload_type } }).then((r) => r.data),
   job: (id: number) => data<UploadJob>(api.get(`/bulk-upload/jobs/${id}`)),
   errorReport: (id: number) => api.get<Blob>(`/bulk-upload/jobs/${id}/errors.xlsx`, { responseType: 'blob' }).then((r) => r.data),
+  departmentsTemplate: () => api.get<Blob>('/bulk-upload/departments/template', { responseType: 'blob' }).then((r) => r.data),
+  uploadDepartments: (file: File, dry_run: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('dry_run', String(dry_run));
+    return data<UploadJob>(api.post('/bulk-upload/departments', form, { timeout: 300_000 }));
+  },
+  subjectsTemplate: () => api.get<Blob>('/bulk-upload/subjects/template', { responseType: 'blob' }).then((r) => r.data),
+  uploadSubjects: (file: File, dry_run: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('dry_run', String(dry_run));
+    return data<UploadJob>(api.post('/bulk-upload/subjects', form, { timeout: 300_000 }));
+  },
+  companiesTemplate: () => api.get<Blob>('/bulk-upload/companies/template', { responseType: 'blob' }).then((r) => r.data),
+  uploadCompanies: (file: File, dry_run: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('dry_run', String(dry_run));
+    return data<UploadJob>(api.post('/bulk-upload/companies', form, { timeout: 300_000 }));
+  },
+  examTypesTemplate: () => api.get<Blob>('/bulk-upload/exam-types/template', { responseType: 'blob' }).then((r) => r.data),
+  uploadExamTypes: (file: File, dry_run: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('dry_run', String(dry_run));
+    return data<UploadJob>(api.post('/bulk-upload/exam-types', form, { timeout: 300_000 }));
+  },
+  academicYearsTemplate: () => api.get<Blob>('/bulk-upload/academic-years/template', { responseType: 'blob' }).then((r) => r.data),
+  uploadAcademicYears: (file: File, dry_run: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('dry_run', String(dry_run));
+    return data<UploadJob>(api.post('/bulk-upload/academic-years', form, { timeout: 300_000 }));
+  },
+  skillMasterTemplate: () => api.get<Blob>('/bulk-upload/skill-master/template', { responseType: 'blob' }).then((r) => r.data),
+  uploadSkillMaster: (file: File, dry_run: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('dry_run', String(dry_run));
+    return data<UploadJob>(api.post('/bulk-upload/skill-master', form, { timeout: 300_000 }));
+  },
+  placementDrivesTemplate: () => api.get<Blob>('/bulk-upload/placement-drives/template', { responseType: 'blob' }).then((r) => r.data),
+  uploadPlacementDrives: (file: File, dry_run: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('dry_run', String(dry_run));
+    return data<UploadJob>(api.post('/bulk-upload/placement-drives', form, { timeout: 300_000 }));
+  },
 };
 
 /** Save a Blob as a file download. */

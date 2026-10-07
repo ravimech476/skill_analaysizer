@@ -8,7 +8,7 @@ import '../main.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/files.dart';
-import '../widgets/master_crud.dart';
+import '../widgets/import_upload.dart';
 import '../widgets/pickers.dart';
 
 /// Staff work class by class and maintain the skill master, the subject mapping and
@@ -23,9 +23,7 @@ class SkillsScreen extends StatelessWidget {
 
     final tabs = <(String, Widget)>[
       ('By class', const _ClassSkills()),
-      if (session.can(['skill.view'])) ('Skill list', const _SkillMaster()),
-      if (session.can(['subject.view'])) ('Subject → skills', const SubjectSkillMapping()),
-      if (session.can(['config.view'])) ('Scoring', const ScoringWeights()),
+      if (session.can(['student_skill.create'])) ('Import', const _SkillsImport()),
     ];
 
     return DefaultTabController(
@@ -109,35 +107,6 @@ class _ClassSkillsState extends State<_ClassSkills> {
       ],
     );
   }
-}
-
-class _SkillMaster extends StatelessWidget {
-  const _SkillMaster();
-
-  @override
-  Widget build(BuildContext context) => MasterCrud(
-        path: 'skills',
-        permission: 'skill',
-        noun: 'skill',
-        fields: const [
-          MasterField('name', 'Skill name', required: true),
-          MasterField(
-            'category',
-            'Category',
-            type: MasterFieldType.select,
-            required: true,
-            options: ['programming', 'framework', 'database', 'tool', 'technical', 'soft_skill', 'domain'],
-          ),
-        ],
-        title: _skillTitle,
-        badges: _skillBadges,
-      );
-
-  static (String, String?) _skillTitle(MasterRow r) => (text(r['name']), pretty(text(r['category'])));
-
-  static List<Widget> _skillBadges(MasterRow r) => [
-        if (asInt(r['student_count']) > 0) Tag('${asInt(r['student_count'])} students'),
-      ];
 }
 
 // ---------------------------------------------------------------- student / parent
@@ -897,4 +866,24 @@ class _WeightRow extends StatelessWidget {
           ],
         ),
       );
+}
+
+// ---------------------------------------------------------------- import
+
+class _SkillsImport extends StatelessWidget {
+  const _SkillsImport();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+      children: [
+        ImportUpload(
+          title: 'student skills',
+          hint: 'One row per student and skill: register number, skill name and a level from 1 to 5.',
+          upload: (file, {required dryRun}) => bulkApi.skills(file, dryRun: dryRun),
+        ),
+      ],
+    );
+  }
 }

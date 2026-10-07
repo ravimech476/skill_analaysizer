@@ -46,6 +46,17 @@ const features = <Feature>[
     },
   ),
   Feature(
+    key: 'departments',
+    icon: Icons.business_outlined,
+    permissions: ['department.view'],
+    audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'Departments', Audience.staff: 'Departments'},
+    description: {
+      Audience.admin: 'Manage departments and HODs',
+      Audience.staff: 'Department directory',
+    },
+  ),
+  Feature(
     key: 'students',
     icon: Icons.school_outlined,
     permissions: ['student.view'],
@@ -80,71 +91,93 @@ const features = <Feature>[
     },
   ),
   Feature(
-    key: 'skills',
-    icon: Icons.star_outline,
-    permissions: ['student_skill.view'],
-    label: {
-      Audience.admin: 'Student Skills',
-      Audience.staff: 'Student Skills',
-      Audience.student: 'My Skills',
-      Audience.parent: "Children's Skills"
-    },
+    key: 'skillmaster',
+    icon: Icons.category_outlined,
+    permissions: ['skill.view'],
+    audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'Skills', Audience.staff: 'Skills'},
     description: {
-      Audience.admin: 'Skill master, blended scores and the subject mapping',
-      Audience.staff: 'Record and verify student skills',
-      Audience.student: 'Skills recorded for you and what they score',
-      Audience.parent: "Skills recorded for your children",
+      Audience.admin: 'Manage the catalogue of skills',
+      Audience.staff: 'Skill directory',
     },
   ),
   Feature(
-    key: 'careers',
-    icon: Icons.explore_outlined,
-    permissions: ['career.view'],
-    label: {
-      Audience.admin: 'Careers',
-      Audience.staff: 'Careers',
-      Audience.student: 'My Careers',
-      Audience.parent: 'Career Guidance'
-    },
+    key: 'companies',
+    icon: Icons.store_outlined,
+    permissions: ['company.view'],
+    audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'Companies', Audience.staff: 'Companies'},
     description: {
-      Audience.admin: 'Career catalogue, required skills, courses and student matches',
-      Audience.staff: 'Which careers fit a student, what is missing and what to study',
-      Audience.student: 'Careers that fit your skills and marks, and what to learn next',
-      Audience.parent: "Careers that fit your child, and what they could study next",
+      Audience.admin: 'Company directory for placement drives',
+      Audience.staff: 'Company directory',
     },
   ),
   Feature(
-    key: 'placement',
+    key: 'drives',
     icon: Icons.emoji_events_outlined,
-    permissions: ['job_role.view', 'placement.view'],
+    permissions: ['job_role.view'],
     label: {
-      Audience.admin: 'Placement',
-      Audience.staff: 'Placement',
+      Audience.admin: 'Placement Drives',
+      Audience.staff: 'Placement Drives',
       Audience.student: 'Placement Drives',
       Audience.parent: 'Placement Status'
     },
     description: {
-      Audience.admin: 'Companies, job roles and placement records',
-      Audience.staff: 'Upcoming drives and placement results',
-      Audience.student: 'Drives you are eligible for and your applications',
+      Audience.admin: 'Create drives with required skills and manage applications',
+      Audience.staff: 'Upcoming drives and student applications',
+      Audience.student: 'Drives you are eligible for',
       Audience.parent: "Your children's placement status",
     },
   ),
   Feature(
-    key: 'analyzer',
-    icon: Icons.insights_outlined,
-    permissions: ['skill_analyzer.view'],
+    key: 'history',
+    icon: Icons.history_outlined,
+    permissions: ['placement.view'],
     label: {
-      Audience.admin: 'Skill Analyzer',
-      Audience.staff: 'Skill Analyzer',
-      Audience.student: 'Skill Gap',
-      Audience.parent: 'Skill Gap'
+      Audience.admin: 'Placement History',
+      Audience.staff: 'Placement History',
+      Audience.student: 'My Placements',
+      Audience.parent: 'Placement Results'
     },
     description: {
-      Audience.admin: 'Rank students against a job role and shortlist',
-      Audience.staff: 'Rank students against a job role',
-      Audience.student: 'Skills you need for each company',
-      Audience.parent: 'Skills your child needs for each company',
+      Audience.admin: 'Confirmed placements, packages and offer letters',
+      Audience.staff: 'Placement records and statistics',
+      Audience.student: 'Your placement offers',
+      Audience.parent: "Your children's placement results",
+    },
+  ),
+  Feature(
+    key: 'studentanalysis',
+    icon: Icons.person_search_outlined,
+    permissions: ['student.view'],
+    label: {Audience.admin: 'Student Analysis', Audience.staff: 'Student Analysis', Audience.student: 'My Analysis', Audience.parent: "Child's Analysis"},
+    description: {
+      Audience.admin: 'Individual student skill analysis from mark history',
+      Audience.staff: 'Student skill analysis from marks',
+      Audience.student: 'Your skill analysis based on your marks',
+      Audience.parent: "Your child's skill analysis",
+    },
+  ),
+  Feature(
+    key: 'classanalysis',
+    icon: Icons.analytics_outlined,
+    permissions: ['class.view'],
+    audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'Class Analysis', Audience.staff: 'Class Analysis'},
+    description: {
+      Audience.admin: 'Class-wide skill overview and performance',
+      Audience.staff: 'Class performance analysis',
+    },
+  ),
+  Feature(
+    key: 'deptanalysis',
+    icon: Icons.assessment_outlined,
+    permissions: ['report.view'],
+    audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'Dept Analysis', Audience.staff: 'Dept Analysis'},
+    description: {
+      Audience.admin: 'Department-wide analytics and comparisons',
+      Audience.staff: 'Department performance analysis',
     },
   ),
   Feature(
@@ -167,17 +200,6 @@ const features = <Feature>[
     description: {Audience.admin: 'Staff profiles, departments and roles', Audience.staff: 'Staff directory'},
   ),
   Feature(
-    key: 'documents',
-    icon: Icons.folder_open_outlined,
-    permissions: ['document.verify'],
-    audiences: [Audience.admin, Audience.staff],
-    label: {Audience.admin: 'Documents', Audience.staff: 'Documents'},
-    description: {
-      Audience.admin: 'Verify the documents students upload',
-      Audience.staff: 'Verify documents uploaded by your students',
-    },
-  ),
-  Feature(
     key: 'reports',
     icon: Icons.pie_chart_outline,
     permissions: ['report.view'],
@@ -189,37 +211,37 @@ const features = <Feature>[
     },
   ),
   Feature(
-    key: 'yearend',
-    icon: Icons.event_repeat_outlined,
-    permissions: ['promotion.view'],
+    key: 'subjects',
+    icon: Icons.menu_book_outlined,
+    permissions: ['subject.view'],
     audiences: [Audience.admin, Audience.staff],
-    label: {Audience.admin: 'Year-end', Audience.staff: 'Year-end'},
+    label: {Audience.admin: 'Subjects', Audience.staff: 'Subjects'},
     description: {
-      Audience.admin: 'Semester change, year promotion, alumni and student history',
-      Audience.staff: 'Semester change for your department and alumni',
+      Audience.admin: 'Subject codes, names, credits and types',
+      Audience.staff: 'Subject directory',
     },
   ),
   Feature(
-    key: 'bulk',
-    icon: Icons.cloud_upload_outlined,
-    permissions: ['bulk_upload.create', 'staff.create', 'student_skill.create'],
+    key: 'examtypes',
+    icon: Icons.assignment_outlined,
+    permissions: ['exam_type.view'],
     audiences: [Audience.admin, Audience.staff],
-    label: {Audience.admin: 'Bulk Upload', Audience.staff: 'Bulk Upload'},
+    label: {Audience.admin: 'Exams', Audience.staff: 'Exams'},
     description: {
-      Audience.admin: 'Import students, staff and student skills from Excel',
-      Audience.staff: 'Import student skill levels from Excel',
+      Audience.admin: 'Exam configuration, max marks and pass percentages',
+      Audience.staff: 'Exam directory',
     },
   ),
   Feature(
-    key: 'academic',
-    icon: Icons.account_balance_outlined,
-    permissions: ['department.create', 'department.update', 'subject.create', 'academic_year.create'],
-    label: _staffOnlyLabel,
-    description: {
-      Audience.admin: 'Departments, academic years, subjects, curriculum and exam types',
-      Audience.staff: 'Departments, subjects and exam types',
-    },
+    key: 'academicyears',
+    icon: Icons.date_range_outlined,
+    permissions: ['academic_year.view'],
     audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'Academic Years', Audience.staff: 'Academic Years'},
+    description: {
+      Audience.admin: 'Academic year periods and current year',
+      Audience.staff: 'Academic year directory',
+    },
   ),
   Feature(
     key: 'users',
@@ -244,6 +266,17 @@ const features = <Feature>[
     },
   ),
   Feature(
+    key: 'threshold',
+    icon: Icons.tune_outlined,
+    permissions: ['config.view'],
+    audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'Skill Analysis Config', Audience.staff: 'Skill Analysis Config'},
+    description: {
+      Audience.admin: 'Global mark threshold and skill scoring weights',
+      Audience.staff: 'View skill scoring configuration',
+    },
+  ),
+  Feature(
     key: 'notifications',
     icon: Icons.notifications_none,
     permissions: ['notification.view'],
@@ -252,15 +285,14 @@ const features = <Feature>[
   ),
 ];
 
-const _staffOnlyLabel = {Audience.admin: 'Academic Setup', Audience.staff: 'Academic Setup'};
-
 /// Sidebar sections, in order. Anything not listed falls into "More".
 const menuGroups = <String, List<String>>{
   'Overview': ['dashboard', 'reports'],
-  'Academics': ['classes', 'marks', 'documents', 'yearend'],
-  'People': ['students', 'staff', 'users', 'roles'],
-  'Placement': ['skills', 'careers', 'placement', 'analyzer'],
-  'Setup & tools': ['academic', 'bulk', 'notifications'],
+  'Academics': ['departments', 'academicyears', 'classes', 'subjects', 'examtypes', 'marks'],
+  'People': ['students', 'staff'],
+  'Skill Analyzer': ['studentanalysis', 'classanalysis', 'deptanalysis'],
+  'Placement': ['companies', 'drives', 'history'],
+  'Settings': ['users', 'roles', 'skillmaster', 'threshold', 'notifications'],
 };
 
 /// Most privileged audience wins for labels (staff + parent reads as staff).

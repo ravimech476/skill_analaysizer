@@ -19,6 +19,9 @@ class BulkUploadScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = context.watch<Session>();
     final tabs = <(String, Widget)>[
+      if (session.can(['department.create'])) ('Depts', const _Upload(kind: 'departments')),
+      if (session.can(['subject.create'])) ('Subjects', const _Upload(kind: 'subjects')),
+      if (session.can(['company.create'])) ('Companies', const _Upload(kind: 'companies')),
       if (session.can(['bulk_upload.create'])) ('Students', const _Upload(kind: 'students')),
       if (session.can(['staff.create'])) ('Staff', const _Upload(kind: 'staff')),
       if (session.can(['student_skill.create'])) ('Skills', const _Upload(kind: 'skills')),
@@ -51,12 +54,18 @@ class _UploadState extends State<_Upload> {
   UploadJob? _result;
 
   String get _title => switch (widget.kind) {
+        'departments' => 'Import departments',
+        'subjects' => 'Import subjects',
+        'companies' => 'Import companies',
         'students' => 'Import students',
         'staff' => 'Import staff',
         _ => 'Import student skills',
       };
 
   String get _hint => switch (widget.kind) {
+        'departments' => 'One row per department: code, name and optional HOD employee code.',
+        'subjects' => 'One row per subject: code, name, credits and optional department code.',
+        'companies' => 'One row per company: name, industry, contact person and optional website.',
         'students' =>
           'One row per student: register number, name, department code, class and optional parent details.',
         'staff' => 'One row per staff member: employee code, name, department code, designation and roles.',
@@ -142,6 +151,9 @@ class _UploadState extends State<_Upload> {
           ? MultipartFile.fromBytes(f.bytes!, filename: f.name)
           : await MultipartFile.fromFile(f.path!, filename: f.name);
       final job = switch (widget.kind) {
+        'departments' => await bulkApi.departments(part, dryRun: _dryRun),
+        'subjects' => await bulkApi.subjects(part, dryRun: _dryRun),
+        'companies' => await bulkApi.companies(part, dryRun: _dryRun),
         'students' => await bulkApi.students(part, dryRun: _dryRun, createMissingClasses: _createClasses),
         'staff' => await bulkApi.staff(part, dryRun: _dryRun),
         _ => await bulkApi.skills(part, dryRun: _dryRun),

@@ -13,11 +13,10 @@ import (
 	"skills-analyzer/internal/config"
 	"skills-analyzer/internal/files"
 	"skills-analyzer/internal/middleware"
+	"skills-analyzer/internal/modules/analyzer"
 	"skills-analyzer/internal/modules/auth"
 	"skills-analyzer/internal/modules/bulkupload"
-	"skills-analyzer/internal/modules/career"
 	"skills-analyzer/internal/modules/class"
-	"skills-analyzer/internal/modules/lifecycle"
 	"skills-analyzer/internal/modules/marks"
 	"skills-analyzer/internal/modules/master"
 	"skills-analyzer/internal/modules/media"
@@ -130,20 +129,19 @@ func New(ctx context.Context, cfg *config.Config, db *pgxpool.Pool) (*gin.Engine
 	// Phase 4: student skills, job roles, skill analyzer, placement
 	placement.Register(private, db, perms, studentSvc, notifier)
 
-	// Phase 6: semester change, year promotion, discontinue / re-admit
-	lifecycle.Register(private, db, perms, studentSvc)
-
 	// Phase 7: analytics dashboard (exports live in their own modules)
 	reports.Register(private, db, perms)
+
+	// Phase 7b: student/class/department skill analyzer
+	analyzer.Register(private, db, perms, studentSvc)
 
 	// Phase 8: photos, resumes and student documents (placement files live in the placement module)
 	media.Register(private, db, perms, studentSvc, notifier)
 
-	// Phase 10: blended skill scores (declared + assessed + certified + academic) and the
-	// career catalogue students are matched against. Registered after placement so the
-	// analyzer is already reading the scores these endpoints maintain.
+	// Phase 10: blended skill scores (declared + assessed + certified + academic).
+	// Registered after placement so the analyzer is already reading the scores
+	// these endpoints maintain.
 	skillscore.Register(private, db, perms, studentSvc)
-	career.Register(private, db, perms, studentSvc, notifier)
 
 	return r, nil
 }

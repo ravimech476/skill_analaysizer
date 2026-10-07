@@ -4,24 +4,28 @@ import 'package:provider/provider.dart';
 import 'auth/access.dart';
 import 'auth/session.dart';
 import 'main.dart';
-import 'screens/academic_screen.dart';
-import 'screens/analyzer_screen.dart';
-import 'screens/bulk_upload_screen.dart';
-import 'screens/careers_screen.dart';
+import 'screens/academic_years_screen.dart';
+import 'screens/student_analysis_screen.dart';
+import 'screens/class_analysis_screen.dart';
+import 'screens/dept_analysis_screen.dart';
 import 'screens/classes_screen.dart';
 import 'screens/dashboard_screen.dart';
-import 'screens/documents_screen.dart';
+import 'screens/departments_screen.dart';
 import 'screens/marks_screen.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/companies_screen.dart';
+import 'screens/placement_history_screen.dart';
 import 'screens/placement_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/roles_screen.dart';
-import 'screens/skills_screen.dart';
+import 'screens/skill_master_screen.dart';
 import 'screens/staff_screen.dart';
 import 'screens/students_screen.dart';
 import 'screens/users_screen.dart';
-import 'screens/year_end_screen.dart';
+import 'screens/threshold_screen.dart';
+import 'screens/subjects_screen.dart';
+import 'screens/exam_types_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
 import 'widgets/files.dart';
@@ -31,32 +35,40 @@ Widget screenFor(String key) {
   switch (key) {
     case 'dashboard':
       return const DashboardScreen();
+    case 'departments':
+      return const DepartmentsScreen();
     case 'students':
       return const StudentsScreen();
     case 'marks':
       return const MarksScreen();
-    case 'skills':
-      return const SkillsScreen();
-    case 'careers':
-      return const CareersScreen();
-    case 'placement':
+    case 'skillmaster':
+      return const SkillMasterScreen();
+    case 'companies':
+      return const CompaniesScreen();
+    case 'drives':
       return const PlacementScreen();
-    case 'analyzer':
-      return const AnalyzerScreen();
+    case 'history':
+      return const PlacementHistoryScreen();
+    case 'studentanalysis':
+      return const StudentAnalysisScreen();
+    case 'classanalysis':
+      return const ClassAnalysisScreen();
+    case 'deptanalysis':
+      return const DeptAnalysisScreen();
     case 'classes':
       return const ClassesScreen();
     case 'staff':
       return const StaffScreen();
-    case 'documents':
-      return const DocumentsScreen();
     case 'reports':
       return const ReportsScreen();
-    case 'yearend':
-      return const YearEndScreen();
-    case 'bulk':
-      return const BulkUploadScreen();
-    case 'academic':
-      return const AcademicScreen();
+    case 'threshold':
+      return const ThresholdScreen();
+    case 'subjects':
+      return const SubjectsScreen();
+    case 'examtypes':
+      return const ExamTypesScreen();
+    case 'academicyears':
+      return const AcademicYearsScreen();
     case 'users':
       return const UsersScreen();
     case 'roles':

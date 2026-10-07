@@ -127,23 +127,6 @@ var Resources = []*Resource{
 		},
 	},
 	{
-		Name:  "Grade",
-		Path:  "/grade-scales",
-		Table: "grade_scales",
-		Perm:  "exam_type",
-		Fields: []Field{
-			{Name: "grade", Kind: Upper, Required: true, Max: 5},
-			{Name: "min_percent", Kind: Number, Required: true, Min: F(0), Cap: F(100)},
-			{Name: "grade_point", Kind: Number, Required: true, Min: F(0), Cap: F(10)},
-			{Name: "is_pass", Kind: Bool, Default: true},
-		},
-		OrderBy: "t.min_percent DESC",
-		Uniques: map[string]string{
-			"ux_grade_scales_grade": "This grade already exists",
-			"ux_grade_scales_min":   "Another grade already starts at this percentage",
-		},
-	},
-	{
 		Name:  "Skill",
 		Path:  "/skills",
 		Table: "skills",
@@ -157,38 +140,14 @@ var Resources = []*Resource{
 		Extra: []string{
 			"(SELECT count(*) FROM student_skills x WHERE x.skill_id = t.id AND x.is_active)::int AS student_count",
 			"(SELECT count(*) FROM job_role_skills x WHERE x.skill_id = t.id AND x.is_active)::int AS job_role_count",
-			"(SELECT count(*) FROM career_skills x WHERE x.skill_id = t.id AND x.is_active)::int AS career_count",
-			"(SELECT count(*) FROM courses x WHERE x.skill_id = t.id AND x.is_active)::int AS course_count",
 			"(SELECT count(*) FROM subject_skills x WHERE x.skill_id = t.id AND x.is_active)::int AS subject_count",
 		},
 		Uniques: map[string]string{"ux_skills_name": "A skill with this name already exists"},
 		InUse: []InUse{
 			{SQL: "SELECT 1 FROM job_role_skills WHERE skill_id = $1 AND is_active", Message: "Skill is required by a job role; remove it there first"},
-			{SQL: "SELECT 1 FROM career_skills WHERE skill_id = $1 AND is_active", Message: "Skill is required by a career; remove it there first"},
 			{SQL: "SELECT 1 FROM subject_skills WHERE skill_id = $1 AND is_active", Message: "Skill is mapped to a subject; remove it there first"},
-			{SQL: "SELECT 1 FROM courses WHERE skill_id = $1 AND is_active", Message: "Courses are listed for this skill; delete them first"},
 			{SQL: "SELECT 1 FROM student_skills WHERE skill_id = $1 AND is_active", Message: "Students have this skill recorded"},
 		},
-	},
-	{
-		// What a student can study to close a skill gap. Career gaps and learning paths read these.
-		Name:  "Course",
-		Path:  "/courses",
-		Table: "courses",
-		Perm:  "career",
-		Fields: []Field{
-			{Name: "skill_id", Kind: FK, Ref: "skills", Required: true},
-			{Name: "title", Kind: String, Required: true, Max: 200},
-			{Name: "provider", Kind: String, Max: 100},
-			{Name: "url", Kind: String, Max: 500},
-			{Name: "level", Kind: Int, Default: float64(1), Min: F(1), Cap: F(5)},
-			{Name: "duration_hours", Kind: Int, Min: F(0), Cap: F(2000)},
-			{Name: "is_certification", Kind: Bool, Default: false},
-			{Name: "is_free", Kind: Bool, Default: true},
-		},
-		Search:  []string{"title", "provider"},
-		OrderBy: "t.title",
-		Extra:   []string{"(SELECT name::text FROM skills WHERE id = t.skill_id) AS skill_name"},
 	},
 	{
 		Name:  "Company",

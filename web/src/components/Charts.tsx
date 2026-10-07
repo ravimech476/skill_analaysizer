@@ -1,6 +1,16 @@
 import { Empty, Tooltip, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
-import { status } from '../theme';
+import { series, status } from '../theme';
+
+/**
+ * Categorical chart palette — starts from the theme `series` array and extends
+ * it with two extra hues so eight categories can be shown without cycling.
+ */
+export const CHART_COLORS: readonly string[] = [
+  ...series,
+  '#0284c7', // sky-600
+  '#c2410c', // orange-700
+];
 
 // Small dependency-free charts for the reports dashboard.
 
@@ -79,4 +89,83 @@ export function scaleColor(pct: number) {
   if (pct < 50) return status.critical;
   if (pct < 75) return status.warning;
   return status.good;
+}
+
+/* ── Donut / pie chart ──────────────────────────────────────────────── */
+
+export interface DonutSegment {
+  key: string;
+  label: string;
+  value: number;
+  color: string;
+}
+
+/** Simple SVG donut chart with an optional center label. */
+export function DonutChart({
+  data,
+  size = 180,
+  label,
+  sublabel,
+}: {
+  data: DonutSegment[];
+  size?: number;
+  label?: ReactNode;
+  sublabel?: ReactNode;
+}) {
+  if (!data.length || data.every((d) => d.value === 0))
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No data" />;
+
+  const total = data.reduce((s, d) => s + d.value, 0);
+  const r = size / 2 - 10;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * r;
+  let offset = -circumference / 4; // start at 12 o'clock
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {data.map((d) => {
+          const pct = total > 0 ? d.value / total : 0;
+          const dash = pct * circumference;
+          const currentOffset = offset;
+          offset += dash;
+          return (
+            <circle
+              key={d.key}
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill="none"
+              stroke={d.color}
+              strokeWidth={28}
+              strokeDasharray={`${dash} ${circumference - dash}`}
+              strokeDashoffset={-currentOffset}
+              style={{ transition: 'stroke-dasharray 0.5s' }}
+            />
+          );
+        })}
+        {label != null && (
+          <>
+            <text x={cx} y={cy - 6} textAnchor="middle" fontSize="22" fontWeight="600" fill="currentColor">
+              {label}
+            </text>
+            {sublabel && (
+              <text x={cx} y={cy + 14} textAnchor="middle" fontSize="12" fill="#888">
+                {sublabel}
+              </text>
+            )}
+          </>
+        )}
+      </svg>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', justifyContent: 'center' }}>
+        {data.map((d) => (
+          <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+            {d.label}: {d.value}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
