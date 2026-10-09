@@ -842,7 +842,7 @@ class _WeightRow extends StatelessWidget {
         child: Row(
           children: [
             SizedBox(
-              width: 120,
+              width: 80,
               child: Text(label, style: const TextStyle(fontSize: 13)),
             ),
             Expanded(
@@ -856,7 +856,7 @@ class _WeightRow extends StatelessWidget {
               ),
             ),
             SizedBox(
-              width: 72,
+              width: 56,
               child: Text(
                 '${value.toStringAsFixed(2)}  ${(share * 100).round()}%',
                 textAlign: TextAlign.right,

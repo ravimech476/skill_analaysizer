@@ -75,10 +75,10 @@ class _DeptAnalysisScreenState extends State<DeptAnalysisScreen> {
                             padding: EdgeInsets.only(bottom: 6),
                             child: Row(
                               children: [
-                                SizedBox(width: 56, child: Text('Dept', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Brand.textSoft))),
-                                SizedBox(width: 46, child: Text('Count', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Brand.textSoft))),
-                                SizedBox(width: 46, child: Text('CGPA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Brand.textSoft))),
-                                SizedBox(width: 46, child: Text('Pass%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Brand.textSoft))),
+                                SizedBox(width: 48, child: Text('Dept', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Brand.textSoft))),
+                                SizedBox(width: 40, child: Text('Count', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Brand.textSoft))),
+                                SizedBox(width: 40, child: Text('CGPA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Brand.textSoft))),
+                                SizedBox(width: 40, child: Text('Pass%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Brand.textSoft))),
                                 Expanded(child: Text('Placed', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Brand.textSoft))),
                               ],
                             ),
@@ -88,22 +88,22 @@ class _DeptAnalysisScreenState extends State<DeptAnalysisScreen> {
                                 child: Row(
                                   children: [
                                     SizedBox(
-                                      width: 56,
+                                      width: 48,
                                       child: Text(text(d['code']),
                                           style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                                     ),
                                     SizedBox(
-                                      width: 46,
+                                      width: 40,
                                       child: Text('${asInt(d['students'])}',
                                           style: const TextStyle(fontSize: 12.5)),
                                     ),
                                     SizedBox(
-                                      width: 46,
+                                      width: 40,
                                       child: Text(asDouble(d['avg_cgpa']).toStringAsFixed(1),
                                           style: const TextStyle(fontSize: 12.5)),
                                     ),
                                     SizedBox(
-                                      width: 46,
+                                      width: 40,
                                       child: Text('${asDouble(d['pass_percent']).toStringAsFixed(0)}%',
                                           style: TextStyle(
                                             fontSize: 12.5,
@@ -133,7 +133,7 @@ class _DeptAnalysisScreenState extends State<DeptAnalysisScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   SizedBox(
-                                    width: 56,
+                                    width: 48,
                                     child: Text(text(d['code']),
                                         style: const TextStyle(fontSize: 11, color: Brand.muted)),
                                   ),

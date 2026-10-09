@@ -205,9 +205,9 @@ class _AnalysisBody extends StatelessWidget {
                       padding: EdgeInsets.only(bottom: 6),
                       child: Row(
                         children: [
-                          SizedBox(width: 60, child: Text('Sem', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Brand.textSoft))),
-                          SizedBox(width: 50, child: Text('SGPA', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Brand.textSoft))),
-                          SizedBox(width: 50, child: Text('Avg %', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Brand.textSoft))),
+                          SizedBox(width: 50, child: Text('Sem', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Brand.textSoft))),
+                          SizedBox(width: 45, child: Text('SGPA', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Brand.textSoft))),
+                          SizedBox(width: 45, child: Text('Avg %', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Brand.textSoft))),
                           Expanded(child: Text('P / F', textAlign: TextAlign.right, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Brand.textSoft))),
                         ],
                       ),
@@ -216,16 +216,16 @@ class _AnalysisBody extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Row(
                             children: [
-                              SizedBox(width: 60, child: Text(text(s['name']), style: const TextStyle(fontSize: 13))),
+                              SizedBox(width: 50, child: Text(text(s['name']), style: const TextStyle(fontSize: 13))),
                               SizedBox(
-                                width: 50,
+                                width: 45,
                                 child: Text(
                                   asDouble(s['sgpa']).toStringAsFixed(2),
                                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                                 ),
                               ),
                               SizedBox(
-                                width: 50,
+                                width: 45,
                                 child: Text(
                                   '${asDouble(s['avg_percent']).toStringAsFixed(0)}%',
                                   style: TextStyle(

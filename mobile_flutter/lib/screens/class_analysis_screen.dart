@@ -200,14 +200,13 @@ class _ClassAnalysisScreenState extends State<ClassAnalysisScreen> {
                                         asDouble(s['cgpa']).toStringAsFixed(2),
                                         style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
                                       ),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                      Wrap(
+                                        spacing: 4,
+                                        runSpacing: 4,
                                         children: [
                                           Tag('${asInt(s['skill_count'])} skills'),
-                                          if (asBool(s['placed'])) ...[
-                                            const SizedBox(width: 4),
+                                          if (asBool(s['placed']))
                                             const Tag('Placed', color: Brand.success),
-                                          ],
                                         ],
                                       ),
                                     ],

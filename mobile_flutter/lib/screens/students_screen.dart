@@ -542,36 +542,41 @@ class _StudentFormState extends State<_StudentForm> {
             final i = e.key;
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    flex: 3,
-                    child: TextField(
-                      decoration: const InputDecoration(hintText: 'Name'),
-                      onChanged: (v) => _parents[i]['name'] = v,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          decoration: const InputDecoration(hintText: 'Name'),
+                          onChanged: (v) => _parents[i]['name'] = v,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(hintText: 'Mobile'),
+                          onChanged: (v) => _parents[i]['mobile'] = v,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 3,
-                    child: TextField(
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(hintText: 'Mobile'),
-                      onChanged: (v) => _parents[i]['mobile'] = v,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 3,
-                    child: EnumPicker(
-                      value: _parents[i]['relation'],
-                      options: const ['father', 'mother', 'guardian'],
-                      onChanged: (v) => setState(() => _parents[i]['relation'] = v ?? 'father'),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 18),
-                    onPressed: () => setState(() => _parents.removeAt(i)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: EnumPicker(
+                          value: _parents[i]['relation'],
+                          options: const ['father', 'mother', 'guardian'],
+                          onChanged: (v) => setState(() => _parents[i]['relation'] = v ?? 'father'),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () => setState(() => _parents.removeAt(i)),
+                      ),
+                    ],
                   ),
                 ],
               ),
