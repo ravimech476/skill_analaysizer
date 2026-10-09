@@ -97,20 +97,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           TabBar(
                             controller: _tabs,
                             tabs: const [Tab(text: 'Password'), Tab(text: 'One-time code')],
-                            onTap: (_) => setState(() => _error = null),
+                            onTap: (_) => setState(() {
+                              _error = null;
+                            }),
                           ),
                           const SizedBox(height: 20),
                           if (_error != null) ...[
                             NoteBanner(title: _error!, color: Brand.error, icon: Icons.error_outline),
                             const SizedBox(height: 14),
                           ],
-                          SizedBox(
-                            height: _tabs.index == 0 ? 196 : (_otpSent ? 236 : 152),
-                            child: TabBarView(
-                              controller: _tabs,
-                              physics: const NeverScrollableScrollPhysics(),
-                              children: [_passwordForm(), _otpForm()],
-                            ),
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 200),
+                            alignment: Alignment.topCenter,
+                            child: [_passwordForm(), _otpForm()][_tabs.index],
                           ),
                         ],
                       ),

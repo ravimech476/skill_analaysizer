@@ -129,7 +129,7 @@ class _DrivesViewState extends State<_DrivesView> {
                                 if (saved == true) setState(() => _reload++);
                               } : null,
                               onDelete: session.can(['job_role.delete']) ? () async {
-                                final yes = await confirm(context, 'Delete "${r.title}"?', 'This will remove the ${r.companyName} drive permanently.');
+                                final yes = await confirm(context, 'Delete "${r.title}"?', body: 'This will remove the ${r.companyName} drive permanently.');
                                 if (!yes) return;
                                 await runAction(context, () => placementApi.deleteRole(r.id), success: 'Drive deleted');
                                 setState(() => _reload++);

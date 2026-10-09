@@ -60,7 +60,7 @@ class _ThresholdScreenState extends State<ThresholdScreen> {
   }
 
   Future<void> _recompute() async {
-    final yes = await confirm(context, 'Recompute all student skill scores?', 'This may take a moment.');
+    final yes = await confirm(context, 'Recompute all student skill scores?', body: 'This may take a moment.');
     if (!yes) return;
     await runAction(context, () async {
       final result = await scoresApi.recompute({'scope': 'all'});
