@@ -8,14 +8,12 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/files.dart';
 import '../widgets/pickers.dart';
-import 'careers_screen.dart';
 import 'marks_screen.dart';
 import 'placement_screen.dart';
 import 'skills_screen.dart';
 import 'students_screen.dart';
 
-/// Everything about one student, in the tabs the web app uses: profile, marks,
-/// skills, careers, placement, documents and history.
+/// Everything about one student: profile, marks, skills, placement and documents.
 class StudentDetailScreen extends StatefulWidget {
   const StudentDetailScreen({super.key, required this.studentId});
   final int studentId;
@@ -39,11 +37,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           ('Profile', _ProfileTab(student: student, onChanged: () => setState(() => _reload++))),
           if (session.can(['marks.view'])) ('Marks', MarkHistoryView(studentId: student.id)),
           if (session.can(['student_skill.view'])) ('Skills', StudentSkillsView(studentId: student.id)),
-          if (session.can(['career.view'])) ('Careers', CareerMatchesView(studentId: student.id)),
           if (session.can(['placement.view', 'job_role.view']))
             ('Placement', StudentOpportunitiesView(studentId: student.id, mode: 'drives')),
           ('Documents', _DocumentsTab(student: student)),
-          if (session.can(['promotion.view'])) ('History', _HistoryTab(studentId: student.id)),
         ];
 
         return DefaultTabController(
@@ -68,7 +64,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       if (await showStudentForm(context, student: student)) setState(() => _reload++);
                     },
                   ),
-                if (session.can(['promotion.create'])) _lifecycleMenu(context, student),
               ],
               bottom: TabBar(tabs: tabs.map((t) => Tab(text: t.$1)).toList()),
             ),
@@ -79,36 +74,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
-  Widget _lifecycleMenu(BuildContext context, Student student) => PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert),
-        itemBuilder: (context) => [
-          if (student.lifecycle == 'studying')
-            const PopupMenuItem(value: 'discontinue', child: Text('Mark as discontinued')),
-          if (student.lifecycle != 'studying') const PopupMenuItem(value: 'readmit', child: Text('Re-admit')),
-        ],
-        onSelected: (action) async {
-          final remarks = await _askRemarks(context, action == 'discontinue' ? 'Discontinue student' : 'Re-admit student');
-          if (remarks == null) return;
-          int? classId;
-          if (action == 'readmit') {
-            classId = await showDialog<int>(
-              context: context,
-              builder: (ctx) => _ClassPickDialog(),
-            );
-            if (classId == null) return;
-          }
-          final ok = await runAction(
-            context,
-            () => lifecycleApi.studentAction(student.id, {
-              'action': action,
-              if (classId != null) 'class_id': classId,
-              if (remarks.isNotEmpty) 'remarks': remarks,
-            }),
-            success: action == 'discontinue' ? 'Marked as discontinued' : 'Re-admitted',
-          );
-          if (ok) setState(() => _reload++);
-        },
-      );
 }
 
 Future<String?> _askRemarks(BuildContext context, String title) {
@@ -128,34 +93,6 @@ Future<String?> _askRemarks(BuildContext context, String title) {
       ],
     ),
   );
-}
-
-class _ClassPickDialog extends StatefulWidget {
-  @override
-  State<_ClassPickDialog> createState() => _ClassPickDialogState();
-}
-
-class _ClassPickDialogState extends State<_ClassPickDialog> {
-  int? _classId;
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-        title: const Text('Re-admit into which class?'),
-        content: RefPicker(
-          hint: 'Class',
-          allowClear: false,
-          load: Lookups.classes,
-          value: _classId,
-          onChanged: (v) => setState(() => _classId = v),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: _classId == null ? null : () => Navigator.pop(context, _classId),
-            child: const Text('Re-admit'),
-          ),
-        ],
-      );
 }
 
 // ---------------------------------------------------------------- profile
@@ -591,31 +528,3 @@ class _DocumentFormState extends State<_DocumentForm> {
   }
 }
 
-// ---------------------------------------------------------------- history
-
-class _HistoryTab extends StatelessWidget {
-  const _HistoryTab({required this.studentId});
-  final int studentId;
-
-  @override
-  Widget build(BuildContext context) => AsyncView<List<Map<String, dynamic>>>(
-        load: () => lifecycleApi.history(studentId),
-        builder: (context, rows, reload) {
-          if (rows.isEmpty) return const EmptyView('No enrolment history recorded yet');
-          return SectionCard(
-            title: 'Where this student studied',
-            child: Column(
-              children: rows
-                  .map((r) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text('${r['class_label']} · ${r['semester']}', style: const TextStyle(fontSize: 14)),
-                        subtitle: Text('${r['academic_year']} · updated ${fmtDate(text(r['updated_at']))}',
-                            style: const TextStyle(fontSize: 12.5)),
-                        trailing: StatusTag(text(r['status'])),
-                      ))
-                  .toList(),
-            ),
-          );
-        },
-      );
-}

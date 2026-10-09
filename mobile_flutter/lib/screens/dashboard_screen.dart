@@ -10,10 +10,9 @@ import '../shell.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/files.dart';
-import 'careers_screen.dart';
 import 'marks_screen.dart';
 import 'placement_screen.dart';
-import 'skills_screen.dart';
+import 'student_analysis_screen.dart';
 import 'students_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -164,15 +163,13 @@ class _MyDashboardState extends State<_MyDashboard> {
         final chosen = children.firstWhere((c) => c.id == _studentId, orElse: () => children.first);
         final results = await Future.wait([
           scoresApi.of(chosen.id).then<Object?>((v) => v).catchError((_) => null),
-          careersApi.matches(chosen.id).then<Object?>((v) => v).catchError((_) => null),
           placementApi.opportunities(chosen.id).then<Object?>((v) => v).catchError((_) => null),
         ]);
         return _Snapshot(
           children: children,
           student: chosen,
           scores: results[0] as SkillScores?,
-          careers: results[1] as CareerMatches?,
-          opportunities: results[2] as Map<String, dynamic>?,
+          opportunities: results[1] as Map<String, dynamic>?,
         );
       },
       builder: (context, snap, reload) {
@@ -186,8 +183,6 @@ class _MyDashboardState extends State<_MyDashboard> {
         final eligible = ops.where((o) => o.isEligible).length;
         final applications = maps(snap.opportunities?['applications']);
         final offers = applications.where((a) => a['status'] == 'selected').toList();
-        final top = snap.careers?.matches.isNotEmpty == true ? snap.careers!.matches.first : null;
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -262,51 +257,27 @@ class _MyDashboardState extends State<_MyDashboard> {
               ),
             ]),
             const SizedBox(height: 12),
-            if (top != null)
-              SectionCard(
-                title: 'Your closest career',
-                trailing: TextButton(
-                  onPressed: () => push(context, SubPage(title: 'Careers', child: const CareersScreen())),
-                  child: const Text('See all'),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(top.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                        ),
-                        Tag(pretty(top.readiness), color: statusColor(top.readiness)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(top.explanation, style: const TextStyle(fontSize: 12.5, color: Brand.textSoft)),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 12),
             SectionCard(
               title: 'Open these next',
               child: Column(
                 children: [
                   _Shortcut(
-                    icon: Icons.menu_book_outlined,
-                    label: 'My marks',
-                    hint: 'Semester results and CGPA',
-                    onTap: () => push(context, SubPage(title: 'Marks', child: const MarksScreen())),
-                  ),
-                  _Shortcut(
-                    icon: Icons.star_outline,
-                    label: 'My skills',
-                    hint: 'What is recorded and what it scores',
-                    onTap: () => push(context, SubPage(title: 'Skills', child: const SkillsScreen())),
+                    icon: Icons.analytics_outlined,
+                    label: 'My analysis',
+                    hint: 'Skill scores and readiness overview',
+                    onTap: () => push(context, SubPage(title: 'My Analysis', child: const StudentAnalysisScreen())),
                   ),
                   _Shortcut(
                     icon: Icons.emoji_events_outlined,
                     label: 'Placement drives',
                     hint: 'Eligibility and your applications',
                     onTap: () => push(context, SubPage(title: 'Placement', child: const PlacementScreen())),
+                  ),
+                  _Shortcut(
+                    icon: Icons.menu_book_outlined,
+                    label: 'My marks',
+                    hint: 'Semester results and CGPA',
+                    onTap: () => push(context, SubPage(title: 'Marks', child: const MarksScreen())),
                   ),
                   _Shortcut(
                     icon: Icons.person_outline,
@@ -325,11 +296,10 @@ class _MyDashboardState extends State<_MyDashboard> {
 }
 
 class _Snapshot {
-  _Snapshot({required this.children, this.student, this.scores, this.careers, this.opportunities});
+  _Snapshot({required this.children, this.student, this.scores, this.opportunities});
   final List<Student> children;
   final Student? student;
   final SkillScores? scores;
-  final CareerMatches? careers;
   final Map<String, dynamic>? opportunities;
 }
 
