@@ -2,6 +2,7 @@ package master
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -141,12 +142,16 @@ var Resources = []*Resource{
 			"(SELECT count(*) FROM student_skills x WHERE x.skill_id = t.id AND x.is_active)::int AS student_count",
 			"(SELECT count(*) FROM job_role_skills x WHERE x.skill_id = t.id AND x.is_active)::int AS job_role_count",
 			"(SELECT count(*) FROM subject_skills x WHERE x.skill_id = t.id AND x.is_active)::int AS subject_count",
+			"(SELECT count(*) FROM career_skills x WHERE x.skill_id = t.id AND x.is_active)::int AS career_count",
+			"(SELECT count(*) FROM courses x WHERE x.skill_id = t.id AND x.is_active)::int AS course_count",
 		},
 		Uniques: map[string]string{"ux_skills_name": "A skill with this name already exists"},
 		InUse: []InUse{
 			{SQL: "SELECT 1 FROM job_role_skills WHERE skill_id = $1 AND is_active", Message: "Skill is required by a job role; remove it there first"},
 			{SQL: "SELECT 1 FROM subject_skills WHERE skill_id = $1 AND is_active", Message: "Skill is mapped to a subject; remove it there first"},
 			{SQL: "SELECT 1 FROM student_skills WHERE skill_id = $1 AND is_active", Message: "Students have this skill recorded"},
+			{SQL: "SELECT 1 FROM career_skills WHERE skill_id = $1 AND is_active", Message: "Skill is required by a career; remove it there first"},
+			{SQL: "SELECT 1 FROM courses WHERE skill_id = $1 AND is_active", Message: "Courses are listed for this skill; delete them first"},
 		},
 	},
 	{
@@ -177,6 +182,62 @@ var Resources = []*Resource{
 		},
 	},
 	{
+		Name:  "Course",
+		Path:  "/courses",
+		Table: "courses",
+		Perm:  "career",
+		Fields: []Field{
+			{Name: "skill_id", Kind: FK, Ref: "skills", Required: true},
+			{Name: "title", Kind: String, Required: true, Max: 200},
+			{Name: "provider", Kind: String, Max: 100},
+			{Name: "url", Kind: String, Max: 500},
+			{Name: "level", Kind: Int, Default: float64(1), Min: F(1), Cap: F(5)},
+			{Name: "duration_hours", Kind: Int, Min: F(0), Cap: F(2000)},
+			{Name: "is_certification", Kind: Bool, Default: false},
+			{Name: "is_free", Kind: Bool, Default: true},
+		},
+		Search:  []string{"title", "provider"},
+		OrderBy: "t.title",
+		Extra:   []string{"(SELECT name::text FROM skills WHERE id = t.skill_id) AS skill_name"},
+	},
+	{
+		Name:  "Interview question",
+		Path:  "/interview-questions",
+		Table: "interview_questions",
+		Perm:  "interview",
+		Fields: []Field{
+			{Name: "company_id", Kind: FK, Ref: "companies"},
+			{Name: "category", Kind: String, Default: "technical", Enum: []string{"technical", "aptitude", "hr", "coding", "group_discussion", "case_study"}},
+			{Name: "question", Kind: String, Required: true, Max: 2000},
+			{Name: "answer", Kind: String, Max: 5000},
+			{Name: "difficulty", Kind: String, Default: "medium", Enum: []string{"easy", "medium", "hard"}},
+			{Name: "tags", Kind: String, Max: 500},
+		},
+		Search:  []string{"question", "tags"},
+		OrderBy: "t.category, t.created_at DESC",
+		Extra: []string{
+			"(SELECT name::text FROM companies WHERE id = t.company_id) AS company_name",
+		},
+	},
+	{
+		Name:  "Study material",
+		Path:  "/study-materials",
+		Table: "study_materials",
+		Perm:  "study_material",
+		Fields: []Field{
+			{Name: "subject_id", Kind: FK, Ref: "subjects", Required: true},
+			{Name: "title", Kind: String, Required: true, Max: 200},
+			{Name: "material_type", Kind: String, Default: "notes", Enum: []string{"notes", "question_paper", "slides", "reference", "video", "link"}},
+			{Name: "description", Kind: String, Max: 1000},
+			{Name: "url", Kind: String, Max: 500},
+		},
+		Search:  []string{"title", "description"},
+		OrderBy: "t.material_type, t.title",
+		Extra: []string{
+			"(SELECT code || ' - ' || name FROM subjects WHERE id = t.subject_id) AS subject_name",
+		},
+	},
+	{
 		Name:     "Year level",
 		Path:     "/year-levels",
 		Table:    "year_levels",
@@ -193,6 +254,124 @@ var Resources = []*Resource{
 		Fields:   []Field{{Name: "name", Kind: String}, {Name: "sem_no", Kind: Int}, {Name: "year_level_id", Kind: FK, Ref: "year_levels"}},
 		OrderBy:  "t.sem_no",
 		ReadOnly: true,
+	},
+
+	// ── Phase 3: Attendance, CO/PO, Question Bank ──
+
+	{
+		Name:  "Attendance",
+		Path:  "/attendance",
+		Table: "attendance",
+		Perm:  "attendance",
+		Fields: []Field{
+			{Name: "student_id", Kind: FK, Ref: "users", Required: true},
+			{Name: "class_id", Kind: FK, Ref: "classes", Required: true},
+			{Name: "subject_id", Kind: FK, Ref: "subjects", Required: true},
+			{Name: "semester_id", Kind: FK, Ref: "semesters", Required: true},
+			{Name: "academic_year_id", Kind: FK, Ref: "academic_years", Required: true},
+			{Name: "total_classes", Kind: Int, Required: true, Min: F(0), Cap: F(500)},
+			{Name: "classes_attended", Kind: Int, Required: true, Min: F(0), Cap: F(500)},
+			{Name: "percentage", Kind: Number, Default: float64(0)},
+		},
+		Search:  []string{},
+		OrderBy: "t.created_at DESC",
+		Extra: []string{
+			"(SELECT name FROM users WHERE id = t.student_id) AS student_name",
+			"(SELECT register_no FROM student_profiles WHERE user_id = t.student_id AND is_active) AS register_no",
+			"(SELECT code || ' - ' || name FROM subjects WHERE id = t.subject_id) AS subject_name",
+		},
+		Uniques: map[string]string{"ux_attendance": "Attendance already recorded for this student/class/subject/semester/year"},
+		Validate: func(v map[string]any) error {
+			total, _ := v["total_classes"].(int64)
+			attended, _ := v["classes_attended"].(int64)
+			if attended > total {
+				return response.BadRequest("classes_attended cannot exceed total_classes")
+			}
+			return nil
+		},
+		BeforeWrite: func(_ context.Context, _ pgx.Tx, _ int64, v map[string]any) error {
+			total, _ := v["total_classes"].(int64)
+			attended, _ := v["classes_attended"].(int64)
+			pct := float64(0)
+			if total > 0 {
+				pct = float64(attended) / float64(total) * 100
+				pct = math.Round(pct*100) / 100
+			}
+			v["percentage"] = pct
+			return nil
+		},
+	},
+	{
+		Name:  "Program outcome",
+		Path:  "/program-outcomes",
+		Table: "program_outcomes",
+		Perm:  "program_outcome",
+		Fields: []Field{
+			{Name: "department_id", Kind: FK, Ref: "departments", Required: true},
+			{Name: "code", Kind: Upper, Required: true, Max: 10},
+			{Name: "description", Kind: String, Required: true, Max: 500},
+		},
+		Search:  []string{"code", "description"},
+		OrderBy: "t.code",
+		Extra: []string{
+			"(SELECT code || ' - ' || name FROM departments WHERE id = t.department_id) AS department_name",
+		},
+	},
+	{
+		Name:  "Course outcome",
+		Path:  "/course-outcomes",
+		Table: "course_outcomes",
+		Perm:  "course_outcome",
+		Fields: []Field{
+			{Name: "subject_id", Kind: FK, Ref: "subjects", Required: true},
+			{Name: "code", Kind: Upper, Required: true, Max: 10},
+			{Name: "description", Kind: String, Required: true, Max: 500},
+		},
+		Search:  []string{"code", "description"},
+		OrderBy: "t.code",
+		Extra: []string{
+			"(SELECT code || ' - ' || name FROM subjects WHERE id = t.subject_id) AS subject_name",
+		},
+	},
+	{
+		Name:  "CO-PO mapping",
+		Path:  "/co-po-mappings",
+		Table: "co_po_mapping",
+		Perm:  "course_outcome",
+		Fields: []Field{
+			{Name: "co_id", Kind: FK, Ref: "course_outcomes", Required: true},
+			{Name: "po_id", Kind: FK, Ref: "program_outcomes", Required: true},
+			{Name: "strength", Kind: Int, Default: float64(2), Min: F(1), Cap: F(3)},
+		},
+		OrderBy: "t.co_id, t.po_id",
+		Extra: []string{
+			"(SELECT code FROM course_outcomes WHERE id = t.co_id) AS co_code",
+			"(SELECT code FROM program_outcomes WHERE id = t.po_id) AS po_code",
+		},
+		Uniques: map[string]string{"ux_co_po": "This CO-PO mapping already exists"},
+	},
+	{
+		Name:  "Question",
+		Path:  "/question-bank",
+		Table: "question_bank",
+		Perm:  "question_bank",
+		Fields: []Field{
+			{Name: "subject_id", Kind: FK, Ref: "subjects", Required: true},
+			{Name: "exam_type_id", Kind: FK, Ref: "exam_types"},
+			{Name: "year", Kind: Int, Min: F(2000), Cap: F(2100)},
+			{Name: "question", Kind: String, Required: true, Max: 5000},
+			{Name: "marks", Kind: Int, Default: float64(0), Min: F(0), Cap: F(100)},
+			{Name: "blooms_level", Kind: String, Default: "understand", Enum: []string{"remember", "understand", "apply", "analyze", "evaluate", "create"}},
+			{Name: "unit", Kind: String, Max: 50},
+			{Name: "co_id", Kind: FK, Ref: "course_outcomes"},
+		},
+		Search:  []string{"question", "unit"},
+		OrderBy: "t.subject_id, t.year DESC, t.marks",
+		Extra: []string{
+			"(SELECT code || ' - ' || name FROM subjects WHERE id = t.subject_id) AS subject_name",
+			"(SELECT name FROM exam_types WHERE id = t.exam_type_id) AS exam_type_name",
+			"(SELECT code FROM course_outcomes WHERE id = t.co_id) AS co_code",
+		},
 	},
 }
 

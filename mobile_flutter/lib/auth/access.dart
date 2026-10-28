@@ -91,6 +91,22 @@ const features = <Feature>[
     },
   ),
   Feature(
+    key: 'attendance',
+    icon: Icons.check_circle_outline,
+    permissions: ['attendance.view'],
+    audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'Attendance', Audience.staff: 'Attendance'},
+    description: {Audience.admin: 'Subject-wise attendance', Audience.staff: 'Record attendance'},
+  ),
+  Feature(
+    key: 'copo',
+    icon: Icons.account_tree_outlined,
+    permissions: ['course_outcome.view'],
+    audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'CO/PO Mapping', Audience.staff: 'CO/PO Mapping'},
+    description: {Audience.admin: 'Course and Program Outcome mapping', Audience.staff: 'View CO-PO mapping'},
+  ),
+  Feature(
     key: 'skillmaster',
     icon: Icons.category_outlined,
     permissions: ['skill.view'],
@@ -147,6 +163,42 @@ const features = <Feature>[
     },
   ),
   Feature(
+    key: 'interviewbank',
+    icon: Icons.quiz_outlined,
+    permissions: ['interview.view'],
+    label: {Audience.admin: 'Interview Bank', Audience.staff: 'Interview Bank', Audience.student: 'Interview Bank', Audience.parent: 'Interview Bank'},
+    description: {
+      Audience.admin: 'Company-wise interview questions',
+      Audience.staff: 'Interview questions by company',
+      Audience.student: 'Practice interview questions',
+      Audience.parent: 'Interview preparation questions',
+    },
+  ),
+  Feature(
+    key: 'questionbank',
+    icon: Icons.help_outline,
+    permissions: ['question_bank.view'],
+    label: {Audience.admin: 'Question Bank', Audience.staff: 'Question Bank', Audience.student: 'Question Bank', Audience.parent: 'Question Bank'},
+    description: {
+      Audience.admin: 'Previous year questions per subject',
+      Audience.staff: 'Manage question bank',
+      Audience.student: 'Practice questions by subject',
+      Audience.parent: 'Question papers',
+    },
+  ),
+  Feature(
+    key: 'studymaterials',
+    icon: Icons.library_books_outlined,
+    permissions: ['study_material.view'],
+    label: {Audience.admin: 'Study Materials', Audience.staff: 'Study Materials', Audience.student: 'Study Materials', Audience.parent: 'Study Materials'},
+    description: {
+      Audience.admin: 'Faculty notes, question papers per subject',
+      Audience.staff: 'Upload study materials',
+      Audience.student: 'Study notes and question papers',
+      Audience.parent: 'Study resources',
+    },
+  ),
+  Feature(
     key: 'studentanalysis',
     icon: Icons.person_search_outlined,
     permissions: ['student.view'],
@@ -178,6 +230,48 @@ const features = <Feature>[
     description: {
       Audience.admin: 'Department-wide analytics and comparisons',
       Audience.staff: 'Department performance analysis',
+    },
+  ),
+  Feature(
+    key: 'readiness',
+    icon: Icons.speed_outlined,
+    permissions: ['report.view'],
+    audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'Placement Readiness', Audience.staff: 'Placement Readiness'},
+    description: {Audience.admin: 'Combined readiness score for students', Audience.staff: 'Student placement readiness'},
+  ),
+  Feature(
+    key: 'careers',
+    icon: Icons.explore_outlined,
+    permissions: ['career.view'],
+    label: {
+      Audience.admin: 'Career Prediction',
+      Audience.staff: 'Career Prediction',
+      Audience.student: 'My Careers',
+      Audience.parent: 'Career Guidance',
+    },
+    description: {
+      Audience.admin: 'Career catalogue, required skills and student career matches',
+      Audience.staff: 'Which careers fit a student based on their skills',
+      Audience.student: 'Careers that fit your skills, and what to learn next',
+      Audience.parent: "Careers that fit your child's skills",
+    },
+  ),
+  Feature(
+    key: 'learningpath',
+    icon: Icons.menu_book_outlined,
+    permissions: ['career.view'],
+    label: {
+      Audience.admin: 'Learning Path',
+      Audience.staff: 'Learning Path',
+      Audience.student: 'Learning Path',
+      Audience.parent: 'Learning Path',
+    },
+    description: {
+      Audience.admin: 'Courses and resources to close skill gaps',
+      Audience.staff: 'Recommended courses for students',
+      Audience.student: 'Courses recommended for you to improve skills',
+      Audience.parent: "Recommended courses for your child",
     },
   ),
   Feature(
@@ -288,10 +382,11 @@ const features = <Feature>[
 /// Sidebar sections, in order. Anything not listed falls into "More".
 const menuGroups = <String, List<String>>{
   'Overview': ['dashboard', 'reports'],
-  'Academics': ['departments', 'academicyears', 'classes', 'subjects', 'examtypes', 'marks'],
+  'Academics': ['departments', 'academicyears', 'classes', 'subjects', 'examtypes', 'marks', 'attendance', 'copo'],
   'People': ['students', 'staff'],
-  'Skill Analyzer': ['studentanalysis', 'classanalysis', 'deptanalysis'],
+  'Skill Analyzer': ['studentanalysis', 'classanalysis', 'deptanalysis', 'readiness', 'careers', 'learningpath'],
   'Placement': ['companies', 'drives', 'history'],
+  'Resources': ['interviewbank', 'studymaterials', 'questionbank'],
   'Settings': ['users', 'roles', 'skillmaster', 'threshold', 'notifications'],
 };
 

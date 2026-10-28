@@ -66,6 +66,24 @@ class Lookups {
         return rows.map((c) => Ref(c.id, c.label, c.raw)).toList();
       });
 
+  static Future<List<Ref>> students() => _of('students', () async {
+        final page = await studentsApi.list(pageSize: 500);
+        return page.rows.map((r) {
+          final s = Student(r);
+          return Ref(s.id, '${s.registerNo.isNotEmpty ? '${s.registerNo} · ' : ''}${s.name}', r);
+        }).toList();
+      });
+
+  static Future<List<Ref>> programOutcomes() => _of('program-outcomes', () async {
+        final rows = await mastersApi.all('program-outcomes');
+        return rows.map((r) => Ref(r.id, '${text(r['code'])} · ${text(r['description'])}', r.raw)).toList();
+      });
+
+  static Future<List<Ref>> courseOutcomes() => _of('course-outcomes', () async {
+        final rows = await mastersApi.all('course-outcomes');
+        return rows.map((r) => Ref(r.id, '${text(r['code'])} · ${text(r['description'])}', r.raw)).toList();
+      });
+
   static Future<List<Ref>> staff() => _of('staff', () async {
         final rows = await staffApi.options();
         return rows

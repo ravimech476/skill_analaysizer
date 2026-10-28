@@ -448,6 +448,14 @@ export function StudentProfile({ id, onEdit }: { id: number; onEdit?: (s: Studen
         <Descriptions.Item label="Date of birth">{s.dob ? dayjs(s.dob).format('DD MMM YYYY') : '—'}</Descriptions.Item>
         <Descriptions.Item label="Blood group">{s.blood_group ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="Address">{s.address ?? '—'}</Descriptions.Item>
+        {(s.aptitude_score != null || s.coding_score != null || s.communication_score != null || s.psychometric_score != null) && (
+          <>
+            <Descriptions.Item label="Aptitude score">{s.aptitude_score != null ? s.aptitude_score : '—'}</Descriptions.Item>
+            <Descriptions.Item label="Coding score">{s.coding_score != null ? s.coding_score : '—'}</Descriptions.Item>
+            <Descriptions.Item label="Communication score">{s.communication_score != null ? s.communication_score : '—'}</Descriptions.Item>
+            <Descriptions.Item label="Psychometric score">{s.psychometric_score != null ? s.psychometric_score : '—'}</Descriptions.Item>
+          </>
+        )}
         {s.status_remarks && <Descriptions.Item label="Status note">{s.status_remarks}</Descriptions.Item>}
         <Descriptions.Item label="Photo">
           {canFiles ? (

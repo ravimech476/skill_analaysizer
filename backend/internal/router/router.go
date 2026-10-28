@@ -25,6 +25,7 @@ import (
 	"skills-analyzer/internal/modules/placement"
 	"skills-analyzer/internal/modules/reports"
 	"skills-analyzer/internal/modules/role"
+	"skills-analyzer/internal/modules/career"
 	"skills-analyzer/internal/modules/skillscore"
 	"skills-analyzer/internal/modules/staff"
 	"skills-analyzer/internal/modules/student"
@@ -142,6 +143,9 @@ func New(ctx context.Context, cfg *config.Config, db *pgxpool.Pool) (*gin.Engine
 	// Registered after placement so the analyzer is already reading the scores
 	// these endpoints maintain.
 	skillscore.Register(private, db, perms, studentSvc)
+
+	// Career matching and learning path
+	career.Register(private, db, perms, studentSvc, notifier)
 
 	return r, nil
 }

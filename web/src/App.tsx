@@ -29,6 +29,14 @@ const DeptAnalysisPage = lazy(() => import('./pages/DeptAnalysisPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const ThresholdPage = lazy(() => import('./pages/ThresholdPage'));
+const CareersPage = lazy(() => import('./pages/CareersPage'));
+const LearningPathPage = lazy(() => import('./pages/LearningPathPage'));
+const InterviewBankPage = lazy(() => import('./pages/InterviewBankPage'));
+const StudyMaterialsPage = lazy(() => import('./pages/StudyMaterialsPage'));
+const AttendancePage = lazy(() => import('./pages/AttendancePage'));
+const COPOPage = lazy(() => import('./pages/COPOPage'));
+const QuestionBankPage = lazy(() => import('./pages/QuestionBankPage'));
+const PlacementReadinessPage = lazy(() => import('./pages/PlacementReadinessPage'));
 
 const PAGES: Record<string, ReactNode> = {
   users: <UsersPage />,
@@ -51,6 +59,14 @@ const PAGES: Record<string, ReactNode> = {
   notifications: <NotificationsPage />,
   reports: <ReportsPage />,
   threshold: <ThresholdPage />,
+  careers: <CareersPage />,
+  learningpath: <LearningPathPage />,
+  interviewbank: <InterviewBankPage />,
+  studymaterials: <StudyMaterialsPage />,
+  attendance: <AttendancePage />,
+  copo: <COPOPage />,
+  questionbank: <QuestionBankPage />,
+  readiness: <PlacementReadinessPage />,
 };
 
 /** Shown while a page's code chunk is loading. */

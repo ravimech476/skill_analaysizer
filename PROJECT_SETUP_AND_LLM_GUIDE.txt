@@ -1,0 +1,633 @@
+================================================================================
+  SKILLS ANALYZER — COMPLETE PROJECT SETUP & LLM INTEGRATION GUIDE
+================================================================================
+
+Table of Contents:
+  1. Project Overview
+  2. Technology Stack
+  3. Prerequisites
+  4. Database Setup (PostgreSQL)
+  5. Backend Setup (Go)
+  6. React Web Setup
+  7. Flutter Mobile Setup
+  8. Login Credentials
+  9. Project Structure
+  10. All Features & Sidebar Menu
+  11. API Endpoints Summary
+  12. Ollama LLM Setup
+  13. RAG (Retrieval Augmented Generation) Implementation
+  14. Chat Module Implementation
+  15. Troubleshooting
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+Skills Analyzer is a college placement and skills management platform that:
+- Tracks student marks, skills, and attendance
+- Analyzes student strengths/weaknesses from mark history
+- Matches students to placement drives based on skills and eligibility
+- Predicts career paths and recommends learning resources
+- Provides interview question bank and study materials
+- Sends notifications to eligible students for placement drives
+- AI Chat Assistant (via Ollama LLM + RAG) for personalized guidance
+
+Three applications:
+- Go Backend API (port 8080)
+- React Web Dashboard (port 5180)
+- Flutter Mobile App (Android/iOS/Web)
+
+================================================================================
+2. TECHNOLOGY STACK
+================================================================================
+
+Backend:
+  - Language: Go 1.27+
+  - Framework: Gin (HTTP router)
+  - Database: PostgreSQL 16+
+  - Driver: pgx/v5 (connection pooling)
+  - Auth: JWT (access + refresh tokens) + OTP (SMS)
+  - File Storage: Local disk with signed URLs
+
+React Web:
+  - React 19 + TypeScript 6
+  - Build Tool: Vite 8
+  - UI Library: Ant Design 6
+  - State Management: TanStack React Query v5
+  - HTTP Client: Axios
+
+Flutter Mobile:
+  - Flutter 3.47+ / Dart 3.13+
+  - HTTP Client: Dio
+  - State: Provider
+  - Token Storage: flutter_secure_storage
+  - File Picking: file_picker, image_picker
+
+LLM (AI Chat):
+  - Ollama (local LLM server)
+  - Model: llama3.2 (8B) or phi3 (3.8B)
+  - Approach: RAG (Retrieval Augmented Generation)
+
+================================================================================
+3. PREREQUISITES
+================================================================================
+
+Install these on the server/development machine:
+
+1. PostgreSQL 16+
+   Download: https://www.postgresql.org/download/
+   Remember the password you set for 'postgres' user
+
+2. Go 1.27+
+   Download: https://go.dev/dl/
+   Verify: go version
+
+3. Node.js 22+ & npm
+   Download: https://nodejs.org/
+   Verify: node --version && npm --version
+
+4. Flutter 3.47+
+   Download: https://flutter.dev/docs/get-started/install
+   Verify: flutter --version
+
+5. Ollama (for LLM/AI features)
+   Download: https://ollama.com/download
+   Verify: ollama --version
+
+================================================================================
+4. DATABASE SETUP (PostgreSQL)
+================================================================================
+
+Step 1: Open psql or pgAdmin
+
+Step 2: Create the database
+  CREATE DATABASE skills_analyzer;
+
+Step 3: Import the database dump (if provided)
+  psql -U postgres -d skills_analyzer -f database.sql
+
+  OR if starting fresh, the backend auto-migrates on startup.
+
+Step 4: Note your connection details
+  Host: localhost
+  Port: 5432
+  Database: skills_analyzer
+  Username: postgres
+  Password: <your_postgres_password>
+
+================================================================================
+5. BACKEND SETUP (Go)
+================================================================================
+
+Step 1: Navigate to backend
+  cd skills-analyzer/backend
+
+Step 2: Create .env file (copy from .env.example)
+  cp .env.example .env
+
+Step 3: Edit .env with your settings
+
+  APP_ENV=development
+  PORT=8080
+  DATABASE_URL=postgres://postgres:<YOUR_PASSWORD>@localhost:5432/skills_analyzer?sslmode=disable
+  AUTO_MIGRATE=true
+
+  JWT_SECRET=<generate-random-32-char-string>
+  ACCESS_TOKEN_TTL=15m
+  REFRESH_TOKEN_TTL=720h
+
+  OTP_TTL=5m
+  OTP_MAX_ATTEMPTS=5
+  OTP_RESEND_AFTER=60s
+  OTP_DEBUG=true
+
+  CORS_ORIGINS=http://localhost:5180,http://localhost:5190,http://localhost:8000,http://localhost:3000
+
+  ADMIN_USERNAME=admin
+  ADMIN_PASSWORD=<your_admin_password>
+  ADMIN_NAME=Administrator
+  ADMIN_MOBILE=9876543210
+
+  PUSH_ENABLED=false
+  COLLEGE_NAME=Your College Name
+  FILES_DIR=storage
+
+  # Ollama LLM (for AI Chat)
+  OLLAMA_URL=http://localhost:11434
+  OLLAMA_MODEL=llama3.2
+
+Step 4: Run the backend
+  go run ./cmd/api
+
+  The backend will:
+  - Connect to PostgreSQL
+  - Auto-run all migrations (creates tables)
+  - Seed the admin user (if none exists)
+  - Start on http://localhost:8080
+
+Step 5: Verify
+  curl http://localhost:8080/health
+  Expected: {"status":"ok","env":"development"}
+
+================================================================================
+6. REACT WEB SETUP
+================================================================================
+
+Step 1: Navigate to web
+  cd skills-analyzer/web
+
+Step 2: Install dependencies
+  npm install
+
+Step 3: Start development server
+  npm run dev
+
+  Opens at http://localhost:5180
+
+Step 4: Build for production
+  npm run build
+  Output: dist/ folder (serve with any static file server)
+
+Environment variable (optional):
+  VITE_API_URL=http://your-server:8080/api/v1
+
+================================================================================
+7. FLUTTER MOBILE SETUP
+================================================================================
+
+Step 1: Navigate to Flutter app
+  cd skills-analyzer/mobile_flutter
+
+Step 2: Get dependencies
+  flutter pub get
+
+Step 3: Run on Chrome (web)
+  flutter run -d chrome --web-port=5190
+
+Step 4: Build Android APK
+  flutter build apk --dart-define=API_URL=http://<SERVER_IP>:8080/api/v1
+
+  APK location: build/app/outputs/flutter-apk/app-release.apk
+
+Step 5: Build iOS (on macOS only)
+  flutter build ios --dart-define=API_URL=http://<SERVER_IP>:8080/api/v1
+
+IMPORTANT: Replace <SERVER_IP> with the actual IP address of the machine
+running the Go backend. Use 'ipconfig' (Windows) or 'ifconfig' (Linux/Mac)
+to find it. The phone must be on the same network.
+
+Windows Firewall: Allow port 8080 (run as Administrator):
+  netsh advfirewall firewall add rule name="Skills Analyzer API" dir=in action=allow protocol=TCP localport=8080
+
+================================================================================
+8. LOGIN CREDENTIALS
+================================================================================
+
+Default Admin:
+  Username: admin
+  Password: <what you set in ADMIN_PASSWORD in .env>
+
+If using the demo database dump:
+  Admin:    admin / admin12345
+  Staff:    priya / password123 (Placement Officer, CSE)
+            kavya / password123 (HOD, CSE)
+            meena / password123 (Staff, CSE)
+            suresh / password123 (HOD, ECE)
+  Students: 25cs001 / password123 (Arun Kumar, CSE)
+            25cs002 / password123 (Anjali Kumar, CSE)
+            25cs003 / password123 (Bharath S, CSE)
+  Parents:  p9200000001 / password123 (Kumar Ramasamy)
+
+Roles:
+  admin — Full access to everything
+  staff — Own department students, marks entry, skills
+  hod — Head of Department, department-wide view
+  placement_officer — All departments, placement management
+  student — Own profile, marks, skills, drives
+  parent — Linked children's data
+
+================================================================================
+9. PROJECT STRUCTURE
+================================================================================
+
+skills-analyzer/
+├── backend/                    Go API server
+│   ├── cmd/api/main.go         Entry point
+│   ├── internal/
+│   │   ├── config/             Environment config
+│   │   ├── database/           PostgreSQL connection + migration runner
+│   │   ├── files/              File upload/download with signed URLs
+│   │   ├── middleware/         Auth, RBAC, rate limiting
+│   │   ├── modules/
+│   │   │   ├── analyzer/       Skill analyzer dashboards + readiness + resume
+│   │   │   ├── auth/           Login, OTP, JWT tokens
+│   │   │   ├── bulkupload/     Excel import for all masters
+│   │   │   ├── career/         Career prediction + matching
+│   │   │   ├── class/          Class management + curriculum
+│   │   │   ├── marks/          Mark entry, grading, CGPA, PDF statements
+│   │   │   ├── master/         Config-driven CRUD engine for all masters
+│   │   │   ├── media/          Photos, resumes, documents
+│   │   │   ├── notification/   In-app + push notifications
+│   │   │   ├── permission/     Permission catalogue
+│   │   │   ├── placement/      Drives, applications, placements, skill matching
+│   │   │   ├── reports/        Analytics dashboard
+│   │   │   ├── role/           Role CRUD
+│   │   │   ├── skillscore/     Blended skill scores + threshold config
+│   │   │   ├── staff/          Staff management
+│   │   │   ├── student/        Student management + skills in form
+│   │   │   └── user/           User management
+│   │   ├── notify/             Push notification service
+│   │   ├── pkg/                Shared utilities
+│   │   ├── rbac/               Role-based access control cache
+│   │   ├── router/             Route registration
+│   │   ├── seed/               Admin seeding
+│   │   └── sms/                SMS providers (MSG91, Twilio, webhook)
+│   ├── migrations/             SQL migration files (000001-000014)
+│   ├── .env                    Environment config (create from .env.example)
+│   └── .env.example            Template
+│
+├── web/                        React web dashboard
+│   ├── src/
+│   │   ├── api/                API client + endpoint functions
+│   │   ├── auth/               Auth context + access control + features
+│   │   ├── components/         Shared components (AppLayout, Charts, MasterCrud, etc.)
+│   │   ├── pages/              All page components (30+ pages)
+│   │   ├── App.tsx             Router + routes
+│   │   ├── main.tsx            Entry point
+│   │   └── theme.ts            Ant Design theme
+│   └── package.json
+│
+├── mobile_flutter/             Flutter mobile app
+│   ├── lib/
+│   │   ├── api/                API client + endpoints + models
+│   │   ├── auth/               Session + access control + features
+│   │   ├── screens/            All screen widgets (25+ screens)
+│   │   ├── widgets/            Shared widgets (charts, common, files, master_crud, etc.)
+│   │   ├── main.dart           Entry point
+│   │   ├── shell.dart          Navigation + app shell
+│   │   └── theme.dart          Material theme
+│   └── pubspec.yaml
+│
+└── database.sql                Database dump (if provided)
+
+================================================================================
+10. ALL FEATURES & SIDEBAR MENU
+================================================================================
+
+OVERVIEW
+  Dashboard                 — Stats overview, module tiles
+  Reports                   — Pass %, CGPA distribution, placement trends
+
+ACADEMICS
+  Departments               — CRUD + Import from Excel
+  Academic Years            — CRUD + Import
+  Classes                   — Class management (dept + year + section)
+  Subjects                  — CRUD + Import
+  Exams                     — Exam types with max marks, pass %
+  Marks                     — Enter marks, class results, upload from Excel
+  Attendance                — Subject-wise attendance tracking
+  CO/PO Mapping             — Course Outcomes to Program Outcomes mapping
+
+PEOPLE
+  Students                  — CRUD + Import + Skills in create/edit form
+  Staff                     — CRUD + Import
+
+SKILL ANALYZER
+  Student Analysis          — Individual student skill dashboard with charts
+  Class Analysis            — Class-wide performance overview
+  Department Analysis       — Cross-department comparison
+  Placement Readiness       — Combined readiness score (CGPA+skills+aptitude+attendance)
+  Career Prediction         — Rule-based career matching with readiness levels
+  Learning Path             — Recommended courses per skill gap
+
+PLACEMENT
+  Companies                 — Company directory + Import
+  Placement Drives          — Create drives, eligible students, shortlist + notify
+  Placement History         — Confirmed placements, stats, offer letters
+
+RESOURCES
+  Interview Bank            — Company-wise interview questions by category
+  Study Materials           — Faculty notes, question papers per subject
+  Question Bank             — Previous year questions with Bloom's taxonomy
+
+SETTINGS
+  Users                     — User CRUD
+  Roles & Permissions       — Role management + permission assignment
+  Skills                    — Skill master catalogue + Import
+  Skill Analysis Config     — Global mark threshold + match weights
+  Notifications             — In-app notifications + send announcements
+
+Every page has an Import tab for bulk upload from Excel.
+
+================================================================================
+11. API ENDPOINTS SUMMARY
+================================================================================
+
+Auth:
+  POST /api/v1/auth/login
+  POST /api/v1/auth/otp/request
+  POST /api/v1/auth/otp/verify
+  POST /api/v1/auth/refresh
+  GET  /api/v1/auth/me
+
+Master CRUD (all have GET list, GET/:id, POST, PUT/:id, PATCH/:id/status, DELETE/:id):
+  /api/v1/departments
+  /api/v1/academic-years
+  /api/v1/subjects
+  /api/v1/exam-types
+  /api/v1/skills
+  /api/v1/companies
+  /api/v1/courses
+  /api/v1/interview-questions
+  /api/v1/study-materials
+  /api/v1/attendance
+  /api/v1/program-outcomes
+  /api/v1/course-outcomes
+  /api/v1/co-po-mappings
+  /api/v1/question-bank
+
+Students & Staff:
+  /api/v1/students (CRUD + skills in body)
+  /api/v1/staff (CRUD)
+  /api/v1/classes (CRUD)
+
+Marks:
+  /api/v1/marks/entry (GET/PUT)
+  /api/v1/marks/sheet
+  /api/v1/marks/students/:id (history)
+
+Placement:
+  /api/v1/job-roles (CRUD + analyze + shortlist)
+  /api/v1/placements (list + stats)
+  /api/v1/applications/:id (status pipeline)
+
+Skill Analyzer:
+  /api/v1/analyzer/student/:id
+  /api/v1/analyzer/class/:id
+  /api/v1/analyzer/department
+  /api/v1/analyzer/readiness
+  /api/v1/analyzer/resume/:id
+
+Career & Learning:
+  /api/v1/careers (CRUD)
+  /api/v1/students/:id/career-matches
+
+Config:
+  /api/v1/config/threshold (GET/PUT)
+  /api/v1/config/scoring (GET/PUT)
+
+Bulk Upload:
+  /api/v1/bulk-upload/departments (template + upload)
+  /api/v1/bulk-upload/students
+  /api/v1/bulk-upload/staff
+  /api/v1/bulk-upload/subjects
+  /api/v1/bulk-upload/skills
+  /api/v1/bulk-upload/skill-master
+  /api/v1/bulk-upload/companies
+  /api/v1/bulk-upload/exam-types
+  /api/v1/bulk-upload/academic-years
+  /api/v1/bulk-upload/placement-drives
+
+Notifications:
+  /api/v1/notifications (inbox, send, read)
+
+Files:
+  POST /api/v1/files (upload)
+  GET  /api/v1/files/:uuid (signed download)
+
+================================================================================
+12. OLLAMA LLM SETUP
+================================================================================
+
+Ollama is a local LLM server. It runs open-source AI models on your machine
+without sending data to the cloud. All data stays private.
+
+Step 1: Install Ollama
+
+  Windows: Download from https://ollama.com/download/windows
+  Linux:   curl -fsSL https://ollama.com/install.sh | sh
+  macOS:   Download from https://ollama.com/download/mac
+
+Step 2: Pull a model
+
+  # Recommended for 8GB+ RAM (good quality, moderate speed)
+  ollama pull llama3.2
+
+  # For 4-8GB RAM (faster, smaller)
+  ollama pull phi3
+
+  # For 16GB+ RAM (best quality)
+  ollama pull llama3.1
+
+Step 3: Test Ollama
+
+  ollama run llama3.2 "Hello, what can you help with?"
+
+Step 4: Verify API is running
+
+  curl http://localhost:11434/api/tags
+  # Should list the models you pulled
+
+Ollama runs on port 11434 by default.
+
+Hardware Requirements:
+  Minimum: 8 GB RAM, any CPU (slow but works)
+  Recommended: 16 GB RAM, 4+ CPU cores
+  Best: 16 GB RAM + NVIDIA GPU (fast responses)
+
+================================================================================
+13. RAG (Retrieval Augmented Generation) — HOW IT WORKS
+================================================================================
+
+RAG means: instead of training the LLM on your data (expensive, complex),
+you SEARCH your database for relevant information and SEND it to the LLM
+along with the user's question. The LLM reads your data and gives a
+personalized answer.
+
+Flow:
+  1. Student asks: "What skills do I need for TCS?"
+  2. Backend searches database:
+     - Finds TCS placement drives → required skills: Aptitude ≥3, Java ≥2
+     - Finds student's skills → Aptitude (4★), Communication (3★)
+     - Finds recommended courses → "Java Fundamentals on NPTEL"
+  3. Backend builds a prompt:
+     "You are an educational assistant for [College Name].
+      Student: Arun Kumar, CGPA 7.8, CSE department.
+      Student skills: Aptitude (4/5), Communication (3/5).
+      TCS drive requires: Aptitude ≥3, Java ≥2, Communication ≥3.
+      Available courses: Java Fundamentals (NPTEL, free, 40 hrs).
+
+      Student question: What skills do I need for TCS?
+
+      Give a personalized, helpful answer."
+  4. Sends to Ollama → gets a natural language response
+  5. Returns to the student in the chat UI
+
+What data gets searched (from YOUR database):
+  - Student profile (CGPA, department, skills, marks)
+  - Placement drives (company requirements, required skills)
+  - Interview questions (practice questions by company)
+  - Study materials (notes, resources per subject)
+  - Career matches (career recommendations)
+  - Courses (learning path recommendations)
+  - Question bank (previous year questions)
+  - Attendance records
+  - CO/PO mappings (curriculum alignment)
+
+No training required. No cloud API costs. Data stays on your server.
+
+================================================================================
+14. CHAT MODULE IMPLEMENTATION
+================================================================================
+
+The AI Chat module needs to be implemented in 3 layers:
+
+--- BACKEND (Go) ---
+
+New module: backend/internal/modules/chat/chat.go
+
+Endpoints:
+  POST /api/v1/chat          — Send a message, get AI response
+  GET  /api/v1/chat/history   — Get chat history for the user
+
+How it works:
+  1. Receive student's question
+  2. Identify the student from JWT token
+  3. Extract keywords/intent from the question
+  4. Query relevant database tables based on intent:
+     - "TCS" → search placement drives, interview questions for TCS
+     - "skills" → fetch student's skills, career matches
+     - "marks" → fetch mark history, strengths/weaknesses
+     - "prepare" → fetch study materials, courses, question bank
+  5. Build a prompt with:
+     - System instructions (you are an educational assistant)
+     - Student context (profile, CGPA, skills, marks summary)
+     - Retrieved data (relevant to the question)
+     - The question itself
+  6. Call Ollama API:
+     POST http://localhost:11434/api/generate
+     Body: { "model": "llama3.2", "prompt": "<built prompt>", "stream": false }
+  7. Return the response to the frontend
+
+--- FRONTEND (React Web) ---
+
+Add a chat widget (floating bubble, bottom-right corner):
+  - Opens a chat panel
+  - Shows conversation history
+  - Text input + send button
+  - Displays AI responses with markdown formatting
+  - Shows "typing..." indicator while waiting
+
+--- FRONTEND (Flutter) ---
+
+Add a chat screen:
+  - Accessible from the sidebar or a floating button
+  - Same chat functionality as web
+  - Uses the same POST /api/v1/chat endpoint
+
+--- ENVIRONMENT CONFIG ---
+
+Add to backend/.env:
+  OLLAMA_URL=http://localhost:11434
+  OLLAMA_MODEL=llama3.2
+
+--- PROMPT TEMPLATE ---
+
+The system prompt should be:
+
+  "You are EduSkill Assistant, an AI educational advisor for [College Name].
+   You help students with:
+   - Understanding their academic performance
+   - Identifying skill gaps for placement
+   - Recommending courses and study materials
+   - Preparing for interviews
+   - Career guidance based on their profile
+
+   Always be encouraging, specific, and actionable.
+   Use the student data provided to give personalized advice.
+   If you don't have enough data, ask the student for clarification.
+   Never make up information — only use the data provided."
+
+================================================================================
+15. TROUBLESHOOTING
+================================================================================
+
+Problem: "Cannot reach the server" on mobile app
+  - Check backend is running: curl http://localhost:8080/health
+  - Check your PC's IP: ipconfig (Windows) / ifconfig (Linux)
+  - Rebuild APK with correct IP: flutter build apk --dart-define=API_URL=http://<CORRECT_IP>:8080/api/v1
+  - Allow firewall: netsh advfirewall firewall add rule name="Skills Analyzer API" dir=in action=allow protocol=TCP localport=8080
+  - Phone must be on same Wi-Fi as server
+
+Problem: "Invalid username or password"
+  - The admin password is set in .env (ADMIN_PASSWORD)
+  - It only creates the admin on FIRST run when no admin exists
+  - To reset: UPDATE users SET password_hash = '<bcrypt_hash>' WHERE username = 'admin';
+  - Generate hash: python -c "import bcrypt; print(bcrypt.hashpw(b'newpassword', bcrypt.gensalt()).decode())"
+
+Problem: Database migration errors
+  - Check PostgreSQL is running
+  - Check DATABASE_URL in .env is correct
+  - Check the postgres user has permission to create tables
+
+Problem: Port already in use
+  - Kill the process: netstat -ano | findstr :8080
+  - Then: taskkill /PID <pid> /F
+
+Problem: CORS errors in browser
+  - Add the frontend URL to CORS_ORIGINS in .env
+  - Restart the backend
+
+Problem: Ollama not responding
+  - Check: ollama list (should show your model)
+  - Check: curl http://localhost:11434/api/tags
+  - Restart: ollama serve
+
+Problem: LLM responses are slow
+  - Use a smaller model: ollama pull phi3
+  - Add more RAM or a GPU
+  - Set a shorter max_tokens in the API call
+
+================================================================================
+  END OF GUIDE
+================================================================================

@@ -34,6 +34,8 @@ func Register(r *gin.RouterGroup, db *pgxpool.Pool, perms *rbac.Cache, students 
 	r.GET("/analyzer/student/:id", can("student.view"), h.studentAnalysis)
 	r.GET("/analyzer/class/:id", can("class.view"), h.classAnalysis)
 	r.GET("/analyzer/department", can("report.view"), h.departmentAnalysis)
+	r.GET("/analyzer/readiness", can("report.view"), h.readiness)
+	r.GET("/analyzer/resume/:id", can("student.view"), h.resumeData)
 }
 
 func pct(a, b int) float64 {
@@ -854,6 +856,245 @@ func (h *Handler) weakSubjects(ctx context.Context, dept *int64) ([]WeakSubject,
 		}
 	}
 	return out, rows.Err()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. GET /analyzer/readiness — Placement Readiness Dashboard
+// ─────────────────────────────────────────────────────────────────────────────
+
+type StudentReadiness struct {
+	ID                 int64   `json:"student_id"`
+	Name               string  `json:"name"`
+	RegisterNo         string  `json:"register_no"`
+	Department         string  `json:"department"`
+	CGPA               float64 `json:"cgpa"`
+	Backlogs           int     `json:"backlog_count"`
+	AptitudeScore      float64 `json:"aptitude_score"`
+	CodingScore        float64 `json:"coding_score"`
+	CommunicationScore float64 `json:"communication_score"`
+	SkillCount         int     `json:"skill_count"`
+	AttendancePercent  float64 `json:"attendance_percent"`
+	IsPlaced           bool    `json:"is_placed"`
+	ReadinessScore     float64 `json:"readiness_score"`
+}
+
+func (h *Handler) readiness(c *gin.Context) {
+	a := actor.From(c)
+	if !a.Has("admin", "placement_officer", "hod", "staff") {
+		response.Error(c, response.Forbidden("Staff only"))
+		return
+	}
+
+	// Scope: staff/hod forced to own department.
+	dept := request.QueryInt64(c, "department_id")
+	if !a.Has("admin", "placement_officer") {
+		var own *int64
+		if err := h.db.QueryRow(c, `SELECT department_id FROM users WHERE id = $1`, a.ID).Scan(&own); err != nil {
+			response.Error(c, err)
+			return
+		}
+		if own != nil {
+			dept = own
+		}
+	}
+
+	classID := request.QueryInt64(c, "class_id")
+
+	rows, err := h.db.Query(c, `
+		SELECT u.id, u.name, sp.register_no,
+		       COALESCE(d.code, ''),
+		       sp.cgpa::float8,
+		       sp.backlog_count,
+		       COALESCE(sp.aptitude_score, 0)::float8,
+		       COALESCE(sp.coding_score, 0)::float8,
+		       COALESCE(sp.communication_score, 0)::float8,
+		       (SELECT count(*) FROM student_skills ss WHERE ss.student_id = u.id AND ss.is_active)::int,
+		       COALESCE((SELECT round(avg(a.percentage)::numeric, 1) FROM attendance a WHERE a.student_id = u.id AND a.is_active), 0)::float8,
+		       EXISTS(SELECT 1 FROM placement_records pr WHERE pr.student_id = u.id AND pr.is_active)
+		FROM student_profiles sp
+		JOIN users u ON u.id = sp.user_id AND u.is_active
+		LEFT JOIN departments d ON d.id = u.department_id
+		WHERE sp.is_active AND sp.lifecycle_status = 'studying'
+		  AND ($1::bigint IS NULL OR sp.current_class_id = $1)
+		  AND ($2::bigint IS NULL OR u.department_id = $2)
+		ORDER BY sp.cgpa DESC`, classID, dept)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	defer rows.Close()
+
+	var results []StudentReadiness
+	for rows.Next() {
+		var s StudentReadiness
+		if err := rows.Scan(&s.ID, &s.Name, &s.RegisterNo, &s.Department, &s.CGPA, &s.Backlogs,
+			&s.AptitudeScore, &s.CodingScore, &s.CommunicationScore, &s.SkillCount, &s.AttendancePercent, &s.IsPlaced); err != nil {
+			response.Error(c, err)
+			return
+		}
+		// Readiness: CGPA(30%) + Skills(25%) + Aptitude(20%) + Attendance(15%) + Communication(10%)
+		cgpaPart := (s.CGPA / 10.0) * 100 * 0.30
+		skillPart := math.Min(float64(s.SkillCount)/5.0*100, 100) * 0.25
+		aptPart := s.AptitudeScore * 0.20
+		attPart := s.AttendancePercent * 0.15
+		commPart := s.CommunicationScore * 0.10
+		s.ReadinessScore = round2(cgpaPart + skillPart + aptPart + attPart + commPart)
+		results = append(results, s)
+	}
+	if err := rows.Err(); err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	sort.Slice(results, func(i, j int) bool { return results[i].ReadinessScore > results[j].ReadinessScore })
+	if results == nil {
+		results = []StudentReadiness{}
+	}
+	response.OK(c, results)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. GET /analyzer/resume/:id — Resume Data (combined student profile)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type ResumeSkill struct {
+	Name        string `json:"name"`
+	Category    string `json:"category"`
+	Proficiency int    `json:"proficiency"`
+}
+
+type ResumeSemester struct {
+	Name       string  `json:"name"`
+	SGPA       float64 `json:"sgpa"`
+	AvgPercent float64 `json:"avg_percent"`
+}
+
+type ResumePlacement struct {
+	Company    string  `json:"company"`
+	Role       string  `json:"role"`
+	PackageLPA float64 `json:"package_lpa"`
+	Status     string  `json:"status"`
+}
+
+type ResumeData struct {
+	StudentID      int64            `json:"student_id"`
+	Name           string           `json:"name"`
+	RegisterNo     string           `json:"register_no"`
+	Email          string           `json:"email"`
+	Mobile         string           `json:"mobile"`
+	Department     string           `json:"department"`
+	Batch          string           `json:"batch"`
+	CGPA           float64          `json:"cgpa"`
+	BacklogCount   int              `json:"backlog_count"`
+	Skills         []ResumeSkill    `json:"skills"`
+	Semesters      []ResumeSemester `json:"semesters"`
+	Placements     []ResumePlacement `json:"placements"`
+	AptitudeScore  float64          `json:"aptitude_score"`
+	CodingScore    float64          `json:"coding_score"`
+	CommScore      float64          `json:"communication_score"`
+	AttendancePct  float64          `json:"attendance_percent"`
+}
+
+func (h *Handler) resumeData(c *gin.Context) {
+	id, ok := request.ID(c, "id")
+	if !ok {
+		return
+	}
+	a := actor.From(c)
+	st, err := h.students.Get(c, a, id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	out := ResumeData{
+		StudentID:    st.ID,
+		Name:         st.Name,
+		RegisterNo:   st.RegisterNo,
+		Email:        strVal(st.Email),
+		Mobile:       strVal(st.Mobile),
+		Department:   strVal(st.DepartmentCode),
+		Batch:        st.Batch,
+		CGPA:         st.CGPA,
+		BacklogCount: st.BacklogCount,
+	}
+
+	// Aptitude / coding / communication scores
+	err = h.db.QueryRow(c, `
+		SELECT COALESCE(aptitude_score, 0)::float8,
+		       COALESCE(coding_score, 0)::float8,
+		       COALESCE(communication_score, 0)::float8
+		FROM student_profiles WHERE user_id = $1 AND is_active`, id).
+		Scan(&out.AptitudeScore, &out.CodingScore, &out.CommScore)
+	if err != nil && err != pgx.ErrNoRows {
+		response.Error(c, err)
+		return
+	}
+
+	// Average attendance
+	err = h.db.QueryRow(c, `
+		SELECT COALESCE(round(avg(percentage)::numeric, 1), 0)::float8
+		FROM attendance WHERE student_id = $1 AND is_active`, id).Scan(&out.AttendancePct)
+	if err != nil && err != pgx.ErrNoRows {
+		response.Error(c, err)
+		return
+	}
+
+	// Skills
+	skillRows, err := h.db.Query(c, `
+		SELECT s.name::text, s.category, ss.proficiency
+		FROM student_skills ss JOIN skills s ON s.id = ss.skill_id
+		WHERE ss.student_id = $1 AND ss.is_active
+		ORDER BY s.name`, id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	out.Skills, err = pgx.CollectRows(skillRows, pgx.RowToStructByPos[ResumeSkill])
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	// Semester summaries (reuse existing helper)
+	sems, err := h.semesterStats(c, id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	out.Semesters = make([]ResumeSemester, len(sems))
+	for i, s := range sems {
+		out.Semesters[i] = ResumeSemester{Name: s.Name, SGPA: s.SGPA, AvgPercent: s.AvgPercent}
+	}
+
+	// Placements
+	plRows, err := h.db.Query(c, `
+		SELECT COALESCE(co.name, ''), COALESCE(jr.title, ''), pr.package_lpa::float8, COALESCE(jr.status, 'completed')
+		FROM placement_records pr
+		LEFT JOIN companies co ON co.id = pr.company_id
+		LEFT JOIN company_job_roles jr ON jr.id = pr.job_role_id
+		WHERE pr.student_id = $1 AND pr.is_active
+		ORDER BY pr.created_at DESC`, id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	out.Placements, err = pgx.CollectRows(plRows, pgx.RowToStructByPos[ResumePlacement])
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	if out.Skills == nil {
+		out.Skills = []ResumeSkill{}
+	}
+	if out.Semesters == nil {
+		out.Semesters = []ResumeSemester{}
+	}
+	if out.Placements == nil {
+		out.Placements = []ResumePlacement{}
+	}
+	response.OK(c, out)
 }
 
 // ── helpers ──

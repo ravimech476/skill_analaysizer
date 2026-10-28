@@ -41,12 +41,22 @@ const MODULE_HUE: Record<string, ModuleHue> = {
   skills: 'amber',
   skillmaster: 'rose',
   careers: 'violet',
+  learningpath: 'teal',
   companies: 'green',
   drives: 'teal',
   history: 'violet',
   studentanalysis: 'violet',
   classanalysis: 'blue',
   deptanalysis: 'green',
+  // Resources
+  interviewbank: 'amber',
+  studymaterials: 'blue',
+  questionbank: 'green',
+  // Academics (new)
+  attendance: 'teal',
+  copo: 'rose',
+  // Skill Analyzer (new)
+  readiness: 'amber',
   // Setup & tools
   bulk: 'teal',
   notifications: 'rose',

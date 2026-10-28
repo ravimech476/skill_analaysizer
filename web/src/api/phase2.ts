@@ -183,6 +183,10 @@ export interface Student {
   lifecycle_status: 'studying' | 'passed_out' | 'discontinued';
   passed_out_year: number | null;
   status_remarks: string | null;
+  aptitude_score: number | null;
+  coding_score: number | null;
+  communication_score: number | null;
+  psychometric_score: number | null;
   photo?: import('./files').FileLink | null;
   resume?: import('./files').FileLink | null;
   parents?: ParentRef[];
@@ -248,7 +252,7 @@ export interface Page {
 
 // ---- generic masters ----
 
-export type MasterPath = 'departments' | 'academic-years' | 'subjects' | 'exam-types' | 'grade-scales' | 'skills' | 'companies' | 'courses';
+export type MasterPath = 'departments' | 'academic-years' | 'subjects' | 'exam-types' | 'grade-scales' | 'skills' | 'companies' | 'courses' | 'interview-questions' | 'study-materials' | 'attendance' | 'program-outcomes' | 'course-outcomes' | 'co-po-mappings' | 'question-bank';
 
 export const mastersApi = {
   list: <T,>(path: MasterPath | 'year-levels' | 'semesters', params: Record<string, unknown> = { all: true }) =>

@@ -23,9 +23,17 @@ import 'screens/skill_master_screen.dart';
 import 'screens/staff_screen.dart';
 import 'screens/students_screen.dart';
 import 'screens/users_screen.dart';
+import 'screens/careers_screen.dart';
+import 'screens/learning_path_screen.dart';
 import 'screens/threshold_screen.dart';
 import 'screens/subjects_screen.dart';
 import 'screens/exam_types_screen.dart';
+import 'screens/attendance_screen.dart';
+import 'screens/co_po_screen.dart';
+import 'screens/interview_bank_screen.dart';
+import 'screens/placement_readiness_screen.dart';
+import 'screens/question_bank_screen.dart';
+import 'screens/study_materials_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
 import 'widgets/files.dart';
@@ -69,10 +77,26 @@ Widget screenFor(String key) {
       return const ExamTypesScreen();
     case 'academicyears':
       return const AcademicYearsScreen();
+    case 'careers':
+      return const CareersScreen();
+    case 'learningpath':
+      return const LearningPathScreen();
     case 'users':
       return const UsersScreen();
     case 'roles':
       return const RolesScreen();
+    case 'attendance':
+      return const AttendanceScreen();
+    case 'copo':
+      return const CoPoScreen();
+    case 'interviewbank':
+      return const InterviewBankScreen();
+    case 'questionbank':
+      return const QuestionBankScreen();
+    case 'readiness':
+      return const PlacementReadinessScreen();
+    case 'studymaterials':
+      return const StudyMaterialsScreen();
     case 'notifications':
       return const NotificationsScreen();
     default:

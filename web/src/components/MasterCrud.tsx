@@ -168,7 +168,7 @@ export default function MasterCrud<T extends { id: number; is_active: boolean }>
               ) : f.type === 'bool' ? (
                 <Switch />
               ) : f.type === 'select' ? (
-                <Select options={f.options} />
+                <Select allowClear showSearch optionFilterProp="label" options={f.options} />
               ) : f.type === 'staff' ? (
                 <StaffSelect />
               ) : (
