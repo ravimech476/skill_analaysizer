@@ -124,7 +124,30 @@ export interface Dashboard {
   placement_by_month: { month: string; offers: number; average_package: number | null }[];
 }
 
+export interface QualityPerson {
+  id: number;
+  name: string;
+  register_no: string;
+}
+
+export interface DataQuality {
+  scope_department: string | null;
+  generated_at: string;
+  report: {
+    students: number;
+    clean_students: number;
+    errors: number;
+    warnings: number;
+    infos: number;
+    areas: { key: string; label: string; clean_students: number; percent: number }[];
+    checks: { key: string; area: string; label: string; severity: 'error' | 'warning' | 'info'; hint: string; count: number; percent: number; sample: QualityPerson[] }[];
+    need_attention: (QualityPerson & { score: number; issues: string[] })[];
+  };
+}
+
 export const reportsApi = {
+  dataQuality: (params: { department_id?: number }) =>
+    api.get<{ data: DataQuality }>('/reports/data-quality', { params }).then((r) => r.data.data),
   dashboard: (params: { department_id?: number; exam_type_id?: number }) =>
     api.get<{ data: Dashboard }>('/reports/dashboard', { params }).then((r) => r.data.data),
 };

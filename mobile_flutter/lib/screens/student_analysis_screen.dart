@@ -10,6 +10,8 @@ import '../theme.dart';
 import '../widgets/charts.dart';
 import '../widgets/common.dart';
 import '../widgets/pickers.dart';
+import '../widgets/skill_suggestions.dart';
+import 'talent_section.dart';
 
 /// Individual student skill analysis derived from mark history, skills and
 /// placement eligibility. Admin/staff pick a student; students see their own;
@@ -192,6 +194,20 @@ class _AnalysisBody extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 10),
+
+            // ── skill levels the marks support (staff accept or dismiss) ──
+            if (context.read<Session>().can(['student_skill.update'])) ...[
+              SkillSuggestionsCard(studentId: studentId, onChanged: reload),
+              const SizedBox(height: 10),
+            ],
+
+            // ── psychometric and coding profile ──
+            InsightSection(studentId: studentId),
+            const SizedBox(height: 10),
+            HistorySection(studentId: studentId),
+            const SizedBox(height: 10),
+            TalentSection(studentId: studentId),
             const SizedBox(height: 10),
 
             // ── semester performance ──

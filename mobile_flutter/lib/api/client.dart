@@ -158,7 +158,9 @@ class ApiClient {
     return r;
   }
 
-  Future<dynamic> post(String path, [Object? body]) async => _unwrap(await dio.post(path, data: body));
+  /// [wait] lifts the receive timeout for calls that are slow by nature (the AI assistant).
+  Future<dynamic> post(String path, [Object? body, Duration? wait]) async => _unwrap(
+      await dio.post(path, data: body, options: wait == null ? null : Options(receiveTimeout: wait)));
   Future<dynamic> put(String path, [Object? body]) async => _unwrap(await dio.put(path, data: body));
   Future<dynamic> patch(String path, [Object? body]) async => _unwrap(await dio.patch(path, data: body));
   Future<dynamic> delete(String path) async => _unwrap(await dio.delete(path));

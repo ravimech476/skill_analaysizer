@@ -21,6 +21,7 @@ class MasterField {
     this.hint,
     this.min,
     this.max,
+    this.after,
   });
 
   final String name;
@@ -36,6 +37,28 @@ class MasterField {
   final String? hint;
   final num? min;
   final num? max;
+
+  /// Extra content shown under this field in the form, for example a "Suggest" button that reads other fields.
+  final Widget Function(MasterFormAccess form)? after;
+}
+
+/// An extra action in a row's menu. [run] does the work; the list reloads afterwards.
+class MasterRowAction {
+  const MasterRowAction(this.label, this.icon, this.run);
+  final String label;
+  final IconData icon;
+  final Future<void> Function(BuildContext context, MasterRow row) run;
+}
+
+/// What a field's [MasterField.after] widget may do with the form it sits in.
+class MasterFormAccess {
+  MasterFormAccess({required this.textOf, required this.setValue});
+
+  /// The current text of a text field (empty when it has none).
+  final String Function(String field) textOf;
+
+  /// Sets a select or reference field and redraws the form.
+  final void Function(String field, dynamic value) setValue;
 }
 
 enum MasterFieldType { text, upper, number, integer, date, boolean, select, reference }
@@ -54,6 +77,8 @@ class MasterCrud extends StatefulWidget {
     this.searchable = true,
     this.readOnly = false,
     this.badges,
+    this.toolbar,
+    this.rowActions,
   });
 
   /// API path, e.g. "departments".
@@ -74,6 +99,12 @@ class MasterCrud extends StatefulWidget {
 
   /// Small tags on the right of a row, e.g. counts.
   final List<Widget> Function(MasterRow row)? badges;
+
+  /// A row of extra actions under the search box. Call the given function to reload the list afterwards.
+  final Widget Function(BuildContext context, VoidCallback reload)? toolbar;
+
+  /// Extra entries in each row's menu, for example "Attach file". The list reloads after one runs.
+  final List<MasterRowAction> Function(MasterRow row)? rowActions;
 
   @override
   State<MasterCrud> createState() => _MasterCrudState();
@@ -108,6 +139,14 @@ class _MasterCrudState extends State<MasterCrud> {
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
               child: SearchBox(hint: 'Search ${widget.noun}s', onChanged: (v) => setState(() => _search = v)),
             ),
+          if (widget.toolbar != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: widget.toolbar!(context, () => setState(() => _reload++)),
+              ),
+            ),
           if (widget.subtitle != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
@@ -140,10 +179,15 @@ class _MasterCrudState extends State<MasterCrud> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             ...?widget.badges?.call(row),
-                            if (canUpdate || canDelete)
+                            if (canUpdate || canDelete || (widget.rowActions?.call(row).isNotEmpty ?? false))
                               PopupMenuButton<String>(
                                 icon: const Icon(Icons.more_vert, size: 20),
                                 itemBuilder: (context) => [
+                                  for (final (i, a) in (widget.rowActions?.call(row) ?? const <MasterRowAction>[]).indexed)
+                                    PopupMenuItem(
+                                      value: 'action:$i',
+                                      child: Row(children: [Icon(a.icon, size: 18, color: Brand.textSoft), const SizedBox(width: 10), Text(a.label)]),
+                                    ),
                                   if (canUpdate) const PopupMenuItem(value: 'edit', child: Text('Edit')),
                                   if (canDelete)
                                     const PopupMenuItem(
@@ -152,7 +196,11 @@ class _MasterCrudState extends State<MasterCrud> {
                                     ),
                                 ],
                                 onSelected: (v) async {
-                                  if (v == 'edit') {
+                                  if (v.startsWith('action:')) {
+                                    final actions = widget.rowActions?.call(row) ?? const <MasterRowAction>[];
+                                    await actions[int.parse(v.substring(7))].run(context, row);
+                                    if (mounted) setState(() => _reload++);
+                                  } else if (v == 'edit') {
                                     _edit(row);
                                   } else if (await confirm(context, 'Delete this ${widget.noun}?',
                                       danger: true, okLabel: 'Delete')) {
@@ -300,6 +348,21 @@ class _MasterFormState extends State<_MasterForm> {
       );
 
   Widget _field(MasterField f) {
+    final field = _fieldInput(f);
+    if (f.after == null) return field;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        field,
+        f.after!(MasterFormAccess(
+          textOf: (name) => _text[name]?.text ?? '',
+          setValue: (name, v) => setState(() => _values[name] = v),
+        )),
+      ],
+    );
+  }
+
+  Widget _fieldInput(MasterField f) {
     switch (f.type) {
       case MasterFieldType.boolean:
         return Padding(

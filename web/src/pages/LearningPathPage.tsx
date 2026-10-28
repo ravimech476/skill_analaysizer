@@ -8,6 +8,7 @@ import { studentsApi } from '../api/phase2';
 import { useAuth } from '../auth/AuthContext';
 import { audienceOf } from '../auth/access';
 import MasterCrud from '../components/MasterCrud';
+import PrepPlan from '../components/PrepPlan';
 import { useSkills } from './SkillsPage';
 import { StudentPicker } from './PlacementPage';
 
@@ -47,6 +48,8 @@ function MyLearningPath({ studentId }: { studentId: number }) {
 
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <PrepPlan studentId={studentId} />
+      <Typography.Title level={5} style={{ margin: '8px 0 0' }}>All recommended courses</Typography.Title>
       <Typography.Paragraph type="secondary">
         Courses recommended to close the skill gaps found in your career matches. Focus on the top items first.
       </Typography.Paragraph>

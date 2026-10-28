@@ -14,21 +14,31 @@ import (
 	"skills-analyzer/internal/files"
 	"skills-analyzer/internal/middleware"
 	"skills-analyzer/internal/modules/analyzer"
+	"skills-analyzer/internal/modules/aptitude"
 	"skills-analyzer/internal/modules/auth"
+	"skills-analyzer/internal/modules/blooms"
+	"skills-analyzer/internal/modules/faculty"
+	"skills-analyzer/internal/modules/insight"
+	"skills-analyzer/internal/modules/quality"
 	"skills-analyzer/internal/modules/bulkupload"
+	"skills-analyzer/internal/modules/career"
+	"skills-analyzer/internal/modules/chat"
 	"skills-analyzer/internal/modules/class"
+	"skills-analyzer/internal/modules/kb"
 	"skills-analyzer/internal/modules/marks"
 	"skills-analyzer/internal/modules/master"
+	"skills-analyzer/internal/modules/materials"
 	"skills-analyzer/internal/modules/media"
 	"skills-analyzer/internal/modules/notification"
 	"skills-analyzer/internal/modules/permission"
 	"skills-analyzer/internal/modules/placement"
 	"skills-analyzer/internal/modules/reports"
 	"skills-analyzer/internal/modules/role"
-	"skills-analyzer/internal/modules/career"
 	"skills-analyzer/internal/modules/skillscore"
+	"skills-analyzer/internal/modules/skillsuggest"
 	"skills-analyzer/internal/modules/staff"
 	"skills-analyzer/internal/modules/student"
+	"skills-analyzer/internal/modules/talent"
 	"skills-analyzer/internal/modules/user"
 	"skills-analyzer/internal/notify"
 	"skills-analyzer/internal/pkg/response"
@@ -135,6 +145,7 @@ func New(ctx context.Context, cfg *config.Config, db *pgxpool.Pool) (*gin.Engine
 
 	// Phase 7b: student/class/department skill analyzer
 	analyzer.Register(private, db, perms, studentSvc)
+	faculty.Register(ctx, private, db, perms, studentSvc, notifier)
 
 	// Phase 8: photos, resumes and student documents (placement files live in the placement module)
 	media.Register(private, db, perms, studentSvc, notifier)
@@ -146,6 +157,26 @@ func New(ctx context.Context, cfg *config.Config, db *pgxpool.Pool) (*gin.Engine
 
 	// Career matching and learning path
 	career.Register(private, db, perms, studentSvc, notifier)
+
+	// AI chat assistant (RAG over the data above, answered by a local Ollama model)
+	kbSvc := kb.NewService(db, kb.NewEmbedder(cfg.OllamaURL, cfg.OllamaEmbedModel))
+	kb.Register(private, perms, kbSvc)
+	kbSvc.SeedInBackground(ctx)
+	materials.Register(private, db, perms, fileSvc, kbSvc)
+	llm := chat.NewOllama(cfg.OllamaURL, cfg.OllamaModel, cfg.OllamaTimeout)
+	chat.Register(private, db, perms, studentSvc, llm, kbSvc)
+
+	// Bloom's Taxonomy level suggestions for the question bank (staff confirm before anything is saved)
+	blooms.Register(private, db, perms, llm)
+	insight.Register(private, db, studentSvc, llm)
+	quality.Register(private, db, perms)
+
+	// Skill suggestions from marks (levels computed in code; subject mappings proposed by the model; staff approve)
+	skillsuggest.Register(private, db, perms, studentSvc, llm)
+
+	// Psychometric questionnaires, coding profiles and projects
+	talent.Register(private, db, perms, studentSvc)
+	aptitude.Register(private, db, studentSvc)
 
 	return r, nil
 }

@@ -17,6 +17,7 @@ import { useDepartments } from '../api/lookups';
 import { exportsApi, reportsApi } from '../api/reports';
 import { useAuth } from '../auth/AuthContext';
 import { Columns, HBars, scaleColor } from '../components/Charts';
+import DataQuality from '../components/DataQuality';
 import { series as DEPT_COLORS } from '../theme';
 
 
@@ -265,6 +266,8 @@ export default function ReportsPage() {
           </Card>
         </Col>
       </Row>
+
+      <DataQuality departmentId={deptId} />
     </Space>
   );
 }

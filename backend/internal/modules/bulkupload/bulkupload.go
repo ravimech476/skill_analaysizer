@@ -98,9 +98,15 @@ func Register(r *gin.RouterGroup, db *pgxpool.Pool, perms *rbac.Cache, students 
 	g.POST("/skill-master", can("skill.create"), h.uploadSkillMaster)
 	g.GET("/placement-drives/template", can("job_role.create"), h.placementDrivesTemplate)
 	g.POST("/placement-drives", can("job_role.create"), h.uploadPlacementDrives)
+	g.GET("/interview-questions/template", can("interview.create"), h.interviewTemplate)
+	g.POST("/interview-questions", can("interview.create"), h.uploadInterview)
+	g.GET("/study-materials/template", can("study_material.create"), h.materialsTemplate)
+	g.POST("/study-materials", can("study_material.create"), h.uploadMaterials)
+	g.GET("/question-bank/template", can("question_bank.create"), h.questionsTemplate)
+	g.POST("/question-bank", can("question_bank.create"), h.uploadQuestions)
 	g.GET("/jobs", can("bulk_upload.view"), h.listJobs)
-	g.GET("/jobs/:id", can("bulk_upload.view", "staff.create", "student_skill.create", "marks.create", "department.create", "subject.create", "company.create", "exam_type.create", "academic_year.create", "skill.create", "job_role.create"), h.getJob)
-	g.GET("/jobs/:id/errors.xlsx", can("bulk_upload.view", "staff.create", "student_skill.create", "marks.create", "department.create", "subject.create", "company.create", "exam_type.create", "academic_year.create", "skill.create", "job_role.create"), h.errorReport)
+	g.GET("/jobs/:id", can("bulk_upload.view", "staff.create", "student_skill.create", "marks.create", "department.create", "subject.create", "company.create", "exam_type.create", "academic_year.create", "skill.create", "job_role.create", "interview.create", "study_material.create", "question_bank.create"), h.getJob)
+	g.GET("/jobs/:id/errors.xlsx", can("bulk_upload.view", "staff.create", "student_skill.create", "marks.create", "department.create", "subject.create", "company.create", "exam_type.create", "academic_year.create", "skill.create", "job_role.create", "interview.create", "study_material.create", "question_bank.create"), h.errorReport)
 }
 
 // writeTemplate builds a data sheet (header + sample or prefilled rows) and an Instructions sheet.

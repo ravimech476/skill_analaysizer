@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Card, InputNumber, Slider, Space, Spin, Table, Typography, App } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, errorMessage } from '../api/client';
+import { SubjectSkillMapping } from '../components/SkillScoring';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -127,7 +128,7 @@ export default function ThresholdPage() {
         </Space>
       </Card>
 
-      <Space>
+      <Space style={{ marginBottom: 16 }}>
         <Button type="primary" loading={saveMut.isPending} onClick={() => saveMut.mutate()}>
           Save Configuration
         </Button>
@@ -135,6 +136,11 @@ export default function ThresholdPage() {
           Recompute All Student Skills
         </Button>
       </Space>
+
+      <Card style={{ marginBottom: 16 }}>
+        <Title level={5} style={{ marginTop: 0 }}>Skills each subject builds</Title>
+        <SubjectSkillMapping />
+      </Card>
     </div>
   );
 }

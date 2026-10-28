@@ -74,6 +74,18 @@ function MatchCard({ m, onRate }: { m: CareerMatch; onRate?: (rating: number) =>
           <Typography.Paragraph type="secondary" style={{ marginTop: 6, marginBottom: 0 }}>
             {m.explanation}
           </Typography.Paragraph>
+          {(m.fit?.score != null || m.growth_outlook != null) && (
+            <Space wrap size={[6, 4]} style={{ marginTop: 6 }}>
+              {m.fit?.interest != null && <Tag>Interest {Math.round(m.fit.interest)}%</Tag>}
+              {m.fit?.personality != null && <Tag>Personality {Math.round(m.fit.personality)}%</Tag>}
+              {m.fit?.coding != null && <Tag>Coding {Math.round(m.fit.coding)}%</Tag>}
+              {m.growth_outlook != null && (
+                <Tooltip title={m.growth_note ?? 'Indicative outlook set by the placement cell'}>
+                  <Tag color="blue">Growth {m.growth_outlook}/5</Tag>
+                </Tooltip>
+              )}
+            </Space>
+          )}
         </Col>
         <Col xs={24} md={8} style={{ textAlign: 'right' }}>
           <Typography.Text strong style={{ fontSize: 22 }}>{m.final_score}</Typography.Text>

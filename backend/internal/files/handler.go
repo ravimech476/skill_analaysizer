@@ -41,6 +41,10 @@ func (s *Service) upload(c *gin.Context) {
 			return
 		}
 	}
+	if (category == "study_material" || category == "interview_document" || category == "question_paper") && !a.Has("admin", "hod", "staff") {
+		response.Error(c, response.Forbidden("Only staff can upload these documents"))
+		return
+	}
 	if category == "notification_attachment" && !a.Has("admin", "placement_officer", "hod", "staff") {
 		response.Error(c, response.Forbidden("Only staff can attach files to notices"))
 		return

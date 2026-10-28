@@ -43,6 +43,7 @@ func Register(r *gin.RouterGroup, db *pgxpool.Pool, perms *rbac.Cache, students 
 	g.DELETE("/:id", can("career.delete"), h.remove)
 
 	r.GET("/students/:id/career-matches", can("career.view"), h.studentMatches)
+	r.GET("/students/:id/prep-plan", can("career.view"), h.prepPlan)
 	r.POST("/students/:id/career-matches", can("career.run"), h.runStudentMatches)
 	r.POST("/students/:id/career-matches/:careerId/feedback", can("career.view"), h.feedback)
 }
@@ -70,18 +71,30 @@ type Career struct {
 	CreatedAt   time.Time     `json:"created_at"`
 	CourseCount int           `json:"course_count"`
 	Skills      []CareerSkill `json:"skills"`
+
+	// What the role asks of a person, used for the fit part of a match.
+	HollandCode     *string  `json:"holland_code"`
+	KeyTraits       []string `json:"key_traits"`
+	CodingRelevance float64  `json:"coding_relevance"`
+	GrowthOutlook   *int     `json:"growth_outlook"`
+	GrowthNote      *string  `json:"growth_note"`
 }
 
 const selectCareer = `
 	SELECT c.id, c.code, c.name, c.domain, c.description, c.avg_package::float8, c.min_cgpa::float8, c.is_active, c.created_at,
 	       (SELECT count(DISTINCT co.id) FROM career_skills cs JOIN courses co ON co.skill_id = cs.skill_id AND co.is_active
-	          WHERE cs.career_id = c.id AND cs.is_active)::int
+	          WHERE cs.career_id = c.id AND cs.is_active)::int,
+	       c.holland_code, c.key_traits, c.coding_relevance::float8, c.growth_outlook::int, c.growth_note
 	FROM careers c`
 
 func scanCareer(row pgx.Row) (*Career, error) {
 	ca := &Career{Skills: []CareerSkill{}}
 	err := row.Scan(&ca.ID, &ca.Code, &ca.Name, &ca.Domain, &ca.Description, &ca.AvgPackage, &ca.MinCGPA,
-		&ca.IsActive, &ca.CreatedAt, &ca.CourseCount)
+		&ca.IsActive, &ca.CreatedAt, &ca.CourseCount,
+		&ca.HollandCode, &ca.KeyTraits, &ca.CodingRelevance, &ca.GrowthOutlook, &ca.GrowthNote)
+	if ca.KeyTraits == nil {
+		ca.KeyTraits = []string{}
+	}
 	return ca, err
 }
 
@@ -240,7 +253,14 @@ type careerInput struct {
 	Description *string  `json:"description"`
 	AvgPackage  *float64 `json:"avg_package" binding:"omitempty,gte=0,lte=500"`
 	MinCGPA     float64  `json:"min_cgpa" binding:"gte=0,lte=10"`
-	Skills      []struct {
+
+	HollandCode     *string  `json:"holland_code" binding:"omitempty,max=3"`
+	KeyTraits       []string `json:"key_traits"`
+	CodingRelevance float64  `json:"coding_relevance" binding:"gte=0,lte=1"`
+	GrowthOutlook   *int     `json:"growth_outlook" binding:"omitempty,min=1,max=5"`
+	GrowthNote      *string  `json:"growth_note" binding:"omitempty,max=500"`
+
+	Skills []struct {
 		SkillID       int64   `json:"skill_id" binding:"required"`
 		RequiredLevel int     `json:"required_level" binding:"required,min=1,max=5"`
 		Weight        float64 `json:"weight" binding:"omitempty,gt=0,lte=10"`
@@ -255,6 +275,22 @@ func (h *Handler) save(c *gin.Context, id int64) {
 	}
 	in.Code = strings.ToUpper(strings.TrimSpace(in.Code))
 	in.Name = strings.TrimSpace(in.Name)
+	if in.HollandCode != nil {
+		code := strings.ToUpper(strings.TrimSpace(*in.HollandCode))
+		for i := 0; i < len(code); i++ {
+			if _, ok := hollandTrait[code[i]]; !ok {
+				response.Error(c, response.BadRequest("holland_code may only use the letters R, I, A, S, E and C"))
+				return
+			}
+		}
+		in.HollandCode = &code
+		if code == "" {
+			in.HollandCode = nil
+		}
+	}
+	if in.KeyTraits == nil {
+		in.KeyTraits = []string{}
+	}
 	if in.Code == "" || in.Name == "" {
 		response.Error(c, response.BadRequest("code and name are required"))
 		return
@@ -284,14 +320,18 @@ func (h *Handler) save(c *gin.Context, id int64) {
 	a := actor.From(c)
 	err := pgx.BeginFunc(c, h.db, func(tx pgx.Tx) error {
 		if id == 0 {
-			if err := tx.QueryRow(c, `INSERT INTO careers (code, name, domain, description, avg_package, min_cgpa, created_by, updated_by)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING id`,
-				in.Code, in.Name, in.Domain, in.Description, in.AvgPackage, in.MinCGPA, a.ID).Scan(&id); err != nil {
+			if err := tx.QueryRow(c, `INSERT INTO careers (code, name, domain, description, avg_package, min_cgpa,
+				holland_code, key_traits, coding_relevance, growth_outlook, growth_note, created_by, updated_by)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12) RETURNING id`,
+				in.Code, in.Name, in.Domain, in.Description, in.AvgPackage, in.MinCGPA,
+				in.HollandCode, in.KeyTraits, in.CodingRelevance, in.GrowthOutlook, in.GrowthNote, a.ID).Scan(&id); err != nil {
 				return err
 			}
 		} else if _, err := tx.Exec(c, `UPDATE careers SET code = $2, name = $3, domain = $4, description = $5,
-			avg_package = $6, min_cgpa = $7, updated_by = $8 WHERE id = $1`,
-			id, in.Code, in.Name, in.Domain, in.Description, in.AvgPackage, in.MinCGPA, a.ID); err != nil {
+			avg_package = $6, min_cgpa = $7, holland_code = $8, key_traits = $9, coding_relevance = $10,
+			growth_outlook = $11, growth_note = $12, updated_by = $13 WHERE id = $1`,
+			id, in.Code, in.Name, in.Domain, in.Description, in.AvgPackage, in.MinCGPA,
+			in.HollandCode, in.KeyTraits, in.CodingRelevance, in.GrowthOutlook, in.GrowthNote, a.ID); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(c, `UPDATE career_skills SET is_active = false, updated_by = $2

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Col, Empty, Input, InputNumber, Modal, Popover, Progress, Row, Segmented, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { BulbOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { errorMessage } from '../api/client';
 import { SOURCE_LABELS, scoresApi, type ScoreSource, type SkillScore, type SubjectMapping } from '../api/careers';
 import { placementApi } from '../api/placement';
+import { skillSuggestApi, type MappingResult } from '../api/skillsuggest';
 import { useAuth } from '../auth/AuthContext';
 
 /** The blended score as a number plus a popover saying where it came from. */
@@ -65,6 +66,22 @@ export function SubjectSkillMapping() {
   const { data: skills } = useQuery({ queryKey: ['lookup', 'skills'], queryFn: placementApi.skills, staleTime: 5 * 60_000 });
   const canEdit = can('subject.update');
 
+  // AI suggestions fill the form rows; staff review and edit them, and nothing is saved until "Save mapping".
+  const [suggestion, setSuggestion] = useState<MappingResult | null>(null);
+  const suggest = useMutation({
+    mutationFn: () => skillSuggestApi.suggestMapping(editing!.row.subject_id),
+    onSuccess: (r) => {
+      setSuggestion(r);
+      setEditing((cur) => {
+        if (!cur) return cur;
+        const have = new Set(cur.skills.map((s) => s.skill_id));
+        const added = r.skills.filter((k) => !have.has(k.skill_id)).map((k) => ({ skill_id: k.skill_id, weight: k.weight }));
+        return { ...cur, skills: [...cur.skills.filter((s) => s.skill_id), ...added] };
+      });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
   const save = useMutation({
     mutationFn: () => scoresApi.setSubjectSkills(editing!.row.subject_id, editing!.skills.filter((s) => s.skill_id)),
     onSuccess: () => {
@@ -72,6 +89,7 @@ export function SubjectSkillMapping() {
       qc.invalidateQueries({ queryKey: ['subject-skills'] });
       qc.invalidateQueries({ queryKey: ['skill-scores'] });
       setEditing(null);
+      setSuggestion(null);
     },
     onError: (e) => message.error(errorMessage(e)),
   });
@@ -147,7 +165,13 @@ export function SubjectSkillMapping() {
                   width: 90,
                   align: 'right' as const,
                   render: (_: unknown, s: SubjectMapping) => (
-                    <Button size="small" onClick={() => setEditing({ row: s, skills: s.skills.map((k) => ({ skill_id: k.skill_id, weight: k.weight })) })}>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setSuggestion(null);
+                        setEditing({ row: s, skills: s.skills.map((k) => ({ skill_id: k.skill_id, weight: k.weight })) });
+                      }}
+                    >
                       {s.skills.length ? 'Edit' : 'Map'}
                     </Button>
                   ),
@@ -161,7 +185,10 @@ export function SubjectSkillMapping() {
         <Modal
           open
           title={`${editing.row.subject_code} · ${editing.row.subject_name}`}
-          onCancel={() => setEditing(null)}
+          onCancel={() => {
+            setEditing(null);
+            setSuggestion(null);
+          }}
           onOk={() => save.mutate()}
           okText="Save mapping"
           okButtonProps={{ loading: save.isPending }}
@@ -169,6 +196,30 @@ export function SubjectSkillMapping() {
           <Typography.Paragraph type="secondary">
             Marks in this subject will count towards each skill below, weighted as shown.
           </Typography.Paragraph>
+          <Button size="small" icon={<BulbOutlined />} loading={suggest.isPending} onClick={() => suggest.mutate()} style={{ marginBottom: 12 }}>
+            Suggest skills with AI
+          </Button>
+          {suggestion && (
+            <Alert
+              style={{ marginBottom: 12 }}
+              showIcon
+              type={suggestion.used_syllabus ? 'info' : 'warning'}
+              title={suggestion.used_syllabus ? 'Based on the uploaded syllabus for this subject.' : 'Based on the subject name only. Please check these carefully.'}
+              description={
+                suggestion.skills.length === 0 ? (
+                  'The AI found no clear match in the skill list. Nothing was added.'
+                ) : (
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {suggestion.skills.map((k) => (
+                      <li key={k.skill_id}>
+                        <b>{k.skill}</b> (weight {k.weight}){k.reason ? `: ${k.reason}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                )
+              }
+            />
+          )}
           {editing.skills.map((s, i) => (
             <Row key={i} gutter={8} align="middle" style={{ marginBottom: 8 }}>
               <Col flex="auto">

@@ -5,6 +5,10 @@ import { api, errorMessage } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { audienceOf } from '../auth/access';
 import { Columns, HBars, DonutChart, scaleColor, CHART_COLORS } from '../components/Charts';
+import SkillSuggestions from '../components/SkillSuggestions';
+import TalentProfile from '../components/TalentProfile';
+import InsightCard from '../components/InsightCard';
+import ScoreHistory from '../components/ScoreHistory';
 
 async function fetchStudentAnalysis(id: number) {
   const r = await api.get(`/analyzer/student/${id}`);
@@ -12,6 +16,7 @@ async function fetchStudentAnalysis(id: number) {
 }
 
 function StudentDashboard({ studentId }: { studentId: number }) {
+  const { can } = useAuth();
   const { data, isLoading, error } = useQuery({
     queryKey: ['analyzer', 'student', studentId],
     queryFn: () => fetchStudentAnalysis(studentId),
@@ -32,6 +37,16 @@ function StudentDashboard({ studentId }: { studentId: number }) {
           <Col xs={12} md={6}><Statistic title="Class" value={data.class_label || '—'} /></Col>
         </Row>
       </Card>
+
+      {can('student_skill.update') && <SkillSuggestions studentId={studentId} />}
+
+      <InsightCard studentId={studentId} />
+
+      <Card title="Readiness over time" style={{ marginTop: 16 }}>
+        <ScoreHistory studentId={studentId} />
+      </Card>
+
+      <TalentProfile studentId={studentId} />
 
       {/* Semester Performance */}
       <Card title="Semester Performance">

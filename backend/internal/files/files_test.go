@@ -1,6 +1,7 @@
 package files
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -93,5 +94,67 @@ func TestLocalStoreRejectsEscapes(t *testing.T) {
 	}
 	if err := s.Delete("2026/09/ok.pdf"); err != nil {
 		t.Fatal("deleting a missing file should be a no-op")
+	}
+}
+
+func zipWith(t *testing.T, names ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, n := range names {
+		w, err := zw.Create(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte("<x/>"))
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func TestSniffOffice(t *testing.T) {
+	docx := zipWith(t, "[Content_Types].xml", "word/document.xml")
+	pptx := zipWith(t, "[Content_Types].xml", "ppt/presentation.xml")
+	other := zipWith(t, "readme.txt", "payload.exe")
+
+	cases := []struct {
+		name string
+		file string
+		data []byte
+		want string
+	}{
+		{"real docx", "Notes.DOCX", docx, docxType},
+		{"real pptx", "slides.pptx", pptx, pptxType},
+		{"docx renamed to pptx", "slides.pptx", docx, ""},
+		{"pptx renamed to docx", "notes.docx", pptx, ""},
+		{"any other zip named .docx", "evil.docx", other, ""},
+		{"not a zip at all", "notes.docx", []byte("plain text"), ""},
+		{"docx without content types", "notes.docx", zipWith(t, "word/document.xml"), ""},
+		{"empty", "notes.docx", nil, ""},
+	}
+	for _, c := range cases {
+		if got := sniffOffice(c.file, c.data); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestStudyMaterialRule(t *testing.T) {
+	r, ok := Rules["study_material"]
+	if !ok || !officeCategories["study_material"] || !officeCategories["interview_document"] || !officeCategories["question_paper"] {
+		t.Fatal("study_material must be a known, Office-aware category")
+	}
+	for _, typ := range []string{"application/pdf", docxType, pptxType} {
+		if !contains(r.Types, typ) {
+			t.Errorf("study_material should allow %s", typ)
+		}
+	}
+	if contains(r.Types, "application/zip") || contains(r.Types, "image/png") {
+		t.Error("raw zips and images must not be accepted as study materials")
+	}
+	if extFor[docxType] != ".docx" || extFor[pptxType] != ".pptx" {
+		t.Error("stored files need the right extensions")
 	}
 }

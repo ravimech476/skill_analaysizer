@@ -335,6 +335,9 @@ class ReportsApi {
   Future<Map<String, dynamic>> dashboard({int? departmentId, int? examTypeId}) async =>
       (await api.get('/reports/dashboard', query: {'department_id': departmentId, 'exam_type_id': examTypeId}))
           as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> dataQuality({int? departmentId}) async =>
+      (await api.get('/reports/data-quality', query: {'department_id': departmentId})) as Map<String, dynamic>;
 }
 
 // ---------- files & documents ----------
@@ -353,6 +356,15 @@ class FilesApi {
       FileLink.from(((await api.put('/students/$studentId/resume', {'file_id': fileId})) as Map)['resume']);
   Future<void> setCompanyLogo(int companyId, int? fileId) => api.put('/companies/$companyId/logo', {'file_id': fileId});
   Future<void> setJobDescription(int roleId, int? fileId) => api.put('/job-roles/$roleId/jd', {'file_id': fileId});
+
+  /// Attaches (or, with null, removes) the file of a study material, interview document or question paper.
+  Future<FileLink?> setDocumentFile(String path, int id, int? fileId) async =>
+      FileLink.from(((await api.put('/$path/$id/file', {'file_id': fileId})) as Map)['file']);
+
+  /// Adds a document's attached file to the AI assistant's knowledge base; returns how many passages were stored.
+  Future<int> indexDocumentForAi(String path, int id) async =>
+      asInt(((await api.post('/$path/$id/index-for-ai', null, const Duration(minutes: 10))) as Map)['chunk_count']);
+
   Future<void> setOfferLetter(int placementId, int? fileId) =>
       api.put('/placements/$placementId/offer-letter', {'file_id': fileId});
 }
@@ -420,6 +432,18 @@ class BulkApi {
       UploadJob((await api.upload('/bulk-upload/placement-drives', 'file', file, fields: {'dry_run': dryRun}))
           as Map<String, dynamic>);
 
+  Future<UploadJob> interviewQuestions(MultipartFile file, {required bool dryRun}) async =>
+      UploadJob((await api.upload('/bulk-upload/interview-questions', 'file', file, fields: {'dry_run': dryRun}))
+          as Map<String, dynamic>);
+
+  Future<UploadJob> studyMaterials(MultipartFile file, {required bool dryRun}) async =>
+      UploadJob((await api.upload('/bulk-upload/study-materials', 'file', file, fields: {'dry_run': dryRun}))
+          as Map<String, dynamic>);
+
+  Future<UploadJob> questionBank(MultipartFile file, {required bool dryRun}) async =>
+      UploadJob((await api.upload('/bulk-upload/question-bank', 'file', file, fields: {'dry_run': dryRun}))
+          as Map<String, dynamic>);
+
   Future<Paged<Map<String, dynamic>>> jobs({int page = 1, int pageSize = 20, String? uploadType}) =>
       api.list('/bulk-upload/jobs', query: {'page': page, 'page_size': pageSize, 'upload_type': uploadType});
 
@@ -447,3 +471,78 @@ final reportsApi = ReportsApi();
 final filesApi = FilesApi();
 final documentsApi = DocumentsApi();
 final bulkApi = BulkApi();
+final chatApi = ChatApi();
+
+// ---------- AI assistant ----------
+
+class ChatApi {
+  // A local model can be slow on a laptop CPU, so waiting for an answer is generous.
+  static const _wait = Duration(minutes: 4);
+
+  Future<List<Map<String, dynamic>>> history({int limit = 50}) async =>
+      maps(await api.get('/chat/history', query: {'limit': limit}));
+
+  /// The answer plus the titles of the knowledge-base documents it was based on.
+  Future<({String answer, List<String> sources})> ask(String message) async {
+    final r = (await api.post('/chat', {'message': message}, _wait)) as Map<String, dynamic>;
+    return (answer: r['answer'] as String, sources: sourceTitles(r['sources']));
+  }
+
+  /// Titles from a `sources` field (null when the answer used no documents).
+  static List<String> sourceTitles(dynamic sources) =>
+      ((sources as List?) ?? const []).map((s) => (s as Map)['title'] as String).toList();
+
+  Future<void> clear() => api.delete('/chat/history');
+}
+
+// ---------- Bloom's Taxonomy suggestions ----------
+
+/// A suggested level for one question. [confidence] is high, medium or low; low means "please check".
+class BloomSuggestion {
+  BloomSuggestion.fromJson(Map<String, dynamic> j)
+      : level = text(j['level']),
+        confidence = text(j['confidence']),
+        reason = text(j['reason']);
+  final String level;
+  final String confidence;
+  final String reason;
+}
+
+/// A stored question compared with what the AI would suggest.
+class BloomReviewItem extends BloomSuggestion {
+  BloomReviewItem.fromJson(super.j)
+      : id = asInt(j['id']),
+        question = text(j['question']),
+        subject = text(j['subject']),
+        marks = asInt(j['marks']),
+        current = text(j['current']),
+        differs = j['differs'] == true,
+        super.fromJson();
+  final int id;
+  final String question;
+  final String subject;
+  final int marks;
+  final String current;
+  final bool differs;
+}
+
+class BloomsApi {
+  // One model call per question, so a review is sent in small batches.
+  static const reviewBatch = 5;
+  static const _wait = Duration(minutes: 5);
+
+  Future<BloomSuggestion> suggest(String question, int marks) async => BloomSuggestion.fromJson(
+      (await api.post('/blooms/suggest', {'question': question, 'marks': marks}, _wait)) as Map<String, dynamic>);
+
+  Future<List<BloomReviewItem>> review(List<int> ids) async =>
+      maps(await api.post('/blooms/review', {'ids': ids}, _wait)).map(BloomReviewItem.fromJson).toList();
+
+  Future<int> apply(List<({int id, String level})> items) async {
+    final r = await api.post('/blooms/apply', {
+      'items': [for (final i in items) {'id': i.id, 'level': i.level}],
+    });
+    return asInt((r as Map<String, dynamic>)['updated']);
+  }
+}
+
+final bloomsApi = BloomsApi();

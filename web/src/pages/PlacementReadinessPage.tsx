@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Card, Col, Empty, Row, Select, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
+import { Card, Checkbox, Col, Empty, Row, Select, Space, Spin, Statistic, Table, Tag, Tooltip, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { api, errorMessage } from '../api/client';
 import { useDepartments, useClasses } from '../api/lookups';
 import { DonutChart } from '../components/Charts';
+import ScoreHistory from '../components/ScoreHistory';
 
 interface ReadinessRow {
   student_id: number;
@@ -16,6 +17,10 @@ interface ReadinessRow {
   attendance_score: number;
   communication_score: number;
   readiness_score: number;
+  coding_score: number | null;
+  change: number | null;
+  risk_level: 'none' | 'medium' | 'high';
+  risk_reasons: { level: string; text: string }[];
 }
 
 interface ReadinessData {
@@ -23,7 +28,10 @@ interface ReadinessData {
   avg_readiness: number;
   above_70_percent: number;
   top_student: string | null;
+  at_risk: { high: number; medium: number };
 }
+
+const RISK = { high: { color: 'red', label: 'High risk' }, medium: { color: 'orange', label: 'Watch' } } as const;
 
 function readinessColor(score: number): string {
   if (score >= 70) return '#15803d';
@@ -34,26 +42,25 @@ function readinessColor(score: number): string {
 function readinessTag(score: number) {
   if (score >= 70) return <Tag color="green">Ready</Tag>;
   if (score >= 50) return <Tag color="orange">Moderate</Tag>;
-  return <Tag color="red">At Risk</Tag>;
+  return <Tag color="red">Low</Tag>;
 }
 
 function ReadinessDashboard({ classId, departmentId }: { classId?: number; departmentId?: number }) {
+  const [onlyRisk, setOnlyRisk] = useState(false);
   const { data, isLoading, error } = useQuery<ReadinessData>({
     queryKey: ['analyzer', 'readiness', classId, departmentId],
     queryFn: () =>
       api
         .get('/analyzer/readiness', { params: { class_id: classId, department_id: departmentId } })
         .then((r) => r.data.data),
-    enabled: !!(classId || departmentId),
   });
 
-  if (!classId && !departmentId) return <Empty description="Select a class or department to view readiness scores" />;
   if (isLoading) return <Spin size="large" style={{ display: 'block', margin: '80px auto' }} />;
   if (error) return <Typography.Text type="danger">{errorMessage(error)}</Typography.Text>;
   if (!data || !data.students?.length) return <Empty description="No readiness data available" />;
 
   const students = [...data.students].sort((a, b) => b.readiness_score - a.readiness_score);
-  const ranked = students.map((s, i) => ({ ...s, rank: i + 1 }));
+  const ranked = students.map((s, i) => ({ ...s, rank: i + 1 })).filter((s) => !onlyRisk || s.risk_level !== 'none');
 
   const ready = students.filter((s) => s.readiness_score >= 70).length;
   const moderate = students.filter((s) => s.readiness_score >= 50 && s.readiness_score < 70).length;
@@ -75,7 +82,15 @@ function ReadinessDashboard({ classId, departmentId }: { classId?: number; depar
         </Col>
         <Col xs={12} md={6}>
           <Card size="small">
-            <Statistic title="Students" value={students.length} />
+            <Statistic
+              title="Needing attention"
+              value={data.at_risk.high + data.at_risk.medium}
+              suffix={`of ${students.length}`}
+              valueStyle={{ color: data.at_risk.high ? '#be123c' : undefined }}
+            />
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {data.at_risk.high} high risk, {data.at_risk.medium} to watch
+            </Typography.Text>
           </Card>
         </Col>
         <Col xs={12} md={6}>
@@ -93,7 +108,7 @@ function ReadinessDashboard({ classId, departmentId }: { classId?: number; depar
               data={[
                 { key: 'ready', label: 'Ready (>=70)', value: ready, color: '#15803d' },
                 { key: 'moderate', label: 'Moderate (50-69)', value: moderate, color: '#d97706' },
-                { key: 'atRisk', label: 'At Risk (<50)', value: atRisk, color: '#be123c' },
+                { key: 'atRisk', label: 'Low (<50)', value: atRisk, color: '#be123c' },
               ]}
               label={students.length}
               sublabel="students"
@@ -101,13 +116,34 @@ function ReadinessDashboard({ classId, departmentId }: { classId?: number; depar
           </Card>
         </Col>
         <Col xs={24} md={16}>
-          <Card title="Student Rankings" size="small">
+          <Card title="Student Rankings" size="small" extra={<Checkbox checked={onlyRisk} onChange={(e) => setOnlyRisk(e.target.checked)}>Only students needing attention</Checkbox>}>
             <Table
               dataSource={ranked}
               rowKey="student_id"
               size="small"
               pagination={{ pageSize: 15, hideOnSinglePage: true }}
-              scroll={{ x: 900 }}
+              scroll={{ x: 1000 }}
+              expandable={{
+                rowExpandable: () => true,
+                expandedRowRender: (r: ReadinessRow) => (
+                  <Row gutter={[16, 8]}>
+                    <Col xs={24} md={10}>
+                      <Typography.Text strong>Why</Typography.Text>
+                      {r.risk_reasons.length ? (
+                        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                          {r.risk_reasons.map((x) => <li key={x.text}>{x.text}</li>)}
+                        </ul>
+                      ) : (
+                        <div><Typography.Text type="secondary">Nothing worrying on record.</Typography.Text></div>
+                      )}
+                    </Col>
+                    <Col xs={24} md={14}>
+                      <Typography.Text strong>Readiness over time</Typography.Text>
+                      <ScoreHistory studentId={r.student_id} />
+                    </Col>
+                  </Row>
+                ),
+              }}
               columns={[
                 { title: '#', dataIndex: 'rank', width: 50, align: 'center' },
                 {
@@ -141,6 +177,25 @@ function ReadinessDashboard({ classId, departmentId }: { classId?: number; depar
                       {readinessTag(v)}
                     </Space>
                   ),
+                },
+                {
+                  title: 'Change',
+                  dataIndex: 'change',
+                  width: 80,
+                  align: 'right',
+                  render: (v: number | null) =>
+                    v == null ? '—' : <span style={{ color: v < 0 ? '#be123c' : v > 0 ? '#15803d' : undefined }}>{v > 0 ? '+' : ''}{v}</span>,
+                },
+                {
+                  title: 'Risk',
+                  dataIndex: 'risk_level',
+                  width: 100,
+                  render: (v: 'none' | 'medium' | 'high', r: ReadinessRow) =>
+                    v === 'none' ? '—' : (
+                      <Tooltip title={r.risk_reasons.map((x) => x.text).join('. ')}>
+                        <Tag color={RISK[v].color}>{RISK[v].label}</Tag>
+                      </Tooltip>
+                    ),
                 },
               ]}
             />

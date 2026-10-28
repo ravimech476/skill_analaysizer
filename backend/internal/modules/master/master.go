@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"skills-analyzer/internal/files"
 	"skills-analyzer/internal/middleware"
 	"skills-analyzer/internal/pkg/actor"
 	"skills-analyzer/internal/pkg/dbutil"
@@ -115,6 +116,23 @@ func (h *Handler) selectSQL() string {
 	return "SELECT " + strings.Join(cols, ", ") + " FROM " + h.res.Table + " t"
 }
 
+// asLink turns a file_json(...) column into a signed link, so a resource can expose an attached file
+// with an Extra such as "file_json(t.file_id) AS file". Any other value is returned as it is.
+func asLink(v any) any {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return v
+	}
+	uuid, _ := m["uuid"].(string)
+	name, _ := m["name"].(string)
+	typ, _ := m["type"].(string)
+	size, _ := m["size"].(float64)
+	if uuid == "" || name == "" {
+		return v
+	}
+	return files.Link{UUID: uuid, Name: name, Type: typ, Size: int64(size)}
+}
+
 func collect(rows pgx.Rows) ([]map[string]any, error) {
 	defer rows.Close()
 	out := []map[string]any{}
@@ -126,7 +144,7 @@ func collect(rows pgx.Rows) ([]map[string]any, error) {
 		}
 		m := make(map[string]any, len(vals))
 		for i, v := range vals {
-			m[fields[i].Name] = v
+			m[fields[i].Name] = asLink(v)
 		}
 		out = append(out, m)
 	}

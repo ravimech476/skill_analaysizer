@@ -21,7 +21,10 @@ export type FileCategory =
   | 'student_document'
   | 'company_logo'
   | 'job_description'
-  | 'notification_attachment';
+  | 'notification_attachment'
+  | 'study_material'
+  | 'interview_document'
+  | 'question_paper';
 
 const IMAGES = 'image/jpeg,image/png,image/webp';
 const PDF = 'application/pdf';
@@ -36,6 +39,9 @@ export const FILE_RULES: Record<FileCategory, { accept: string; maxMB: number; h
   certificate: { accept: `${PDF},${IMAGES}`, maxMB: 5, hint: 'PDF or image, up to 5 MB' },
   student_document: { accept: `${PDF},${IMAGES}`, maxMB: 5, hint: 'PDF or image, up to 5 MB' },
   notification_attachment: { accept: `${PDF},${IMAGES}`, maxMB: 10, hint: 'PDF or image, up to 10 MB' },
+  study_material: { accept: `${PDF},.docx,.pptx`, maxMB: 15, hint: 'PDF, Word (.docx) or PowerPoint (.pptx), up to 15 MB' },
+  interview_document: { accept: `${PDF},.docx,.pptx`, maxMB: 15, hint: 'PDF, Word (.docx) or PowerPoint (.pptx), up to 15 MB' },
+  question_paper: { accept: `${PDF},.docx,.pptx`, maxMB: 15, hint: 'PDF, Word (.docx) or PowerPoint (.pptx), up to 15 MB' },
 };
 
 export const fileUrl = (l: FileLink, download = false) => API_URL + l.url + (download ? '&download=1' : '');
@@ -52,6 +58,11 @@ export const filesApi = {
     api.put<{ data: { photo: FileLink | null } }>(`/users/${userId}/photo`, { file_id }).then((r) => r.data.data.photo),
   setResume: (studentId: number, file_id: number | null) =>
     api.put<{ data: { resume: FileLink | null } }>(`/students/${studentId}/resume`, { file_id }).then((r) => r.data.data.resume),
+  /** Attaches (or, with null, removes) the file of a study material, interview document or question paper. */
+  setDocumentFile: (path: 'study-materials' | 'interview-documents' | 'question-papers', id: number, file_id: number | null) =>
+    api.put<{ data: { file: FileLink | null } }>(`/${path}/${id}/file`, { file_id }).then((r) => r.data.data.file),
+  setMaterialFile: (materialId: number, file_id: number | null) =>
+    api.put<{ data: { file: FileLink | null } }>(`/study-materials/${materialId}/file`, { file_id }).then((r) => r.data.data.file),
   setCompanyLogo: (companyId: number, file_id: number | null) => api.put(`/companies/${companyId}/logo`, { file_id }),
   setJD: (roleId: number, file_id: number | null) => api.put(`/job-roles/${roleId}/jd`, { file_id }),
   setOfferLetter: (placementId: number, file_id: number | null) => api.put(`/placements/${placementId}/offer-letter`, { file_id }),

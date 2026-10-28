@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Avatar, Button, Popconfirm, Space, Tooltip, Typography, Upload, message } from 'antd';
-import { DeleteOutlined, FileImageOutlined, FilePdfOutlined, UploadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, FileImageOutlined, FileOutlined, FilePdfOutlined, FilePptOutlined, FileWordOutlined, UploadOutlined } from '@ant-design/icons';
 import { errorMessage } from '../api/client';
 import { FILE_RULES, fileUrl, filesApi, type FileCategory, type FileLink, type UploadedFile } from '../api/files';
 import { series } from '../theme';
@@ -22,12 +22,20 @@ export function UserAvatar({ name, photo, size = 'default' }: { name?: string; p
   );
 }
 
+/** The icon that matches a stored file's type. */
+function FileIcon({ type }: { type: string }) {
+  if (type === 'application/pdf') return <FilePdfOutlined />;
+  if (type.startsWith('image/')) return <FileImageOutlined />;
+  if (type.includes('wordprocessingml')) return <FileWordOutlined />;
+  if (type.includes('presentationml')) return <FilePptOutlined />;
+  return <FileOutlined />;
+}
+
 /** Opens a stored file in a new tab. */
 export function FileAnchor({ link, label, icon = true }: { link: FileLink; label?: ReactNode; icon?: boolean }) {
-  const isPdf = link.type === 'application/pdf';
   return (
     <Typography.Link href={fileUrl(link)} target="_blank" rel="noreferrer">
-      {icon && (isPdf ? <FilePdfOutlined /> : <FileImageOutlined />)} {label ?? link.name}
+      {icon && <FileIcon type={link.type} />} {label ?? link.name}
     </Typography.Link>
   );
 }

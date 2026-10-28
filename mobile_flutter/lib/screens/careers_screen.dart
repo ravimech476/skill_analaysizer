@@ -235,6 +235,15 @@ class _MatchCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(match.explanation, style: const TextStyle(color: Brand.textSoft, fontSize: 13)),
             ],
+            if (match.interestFit != null || match.personalityFit != null || match.codingFit != null || match.growthOutlook != null) ...[
+              const SizedBox(height: 6),
+              Wrap(spacing: 6, runSpacing: 4, children: [
+                if (match.interestFit != null) Tag('Interest ${match.interestFit!.round()}%'),
+                if (match.personalityFit != null) Tag('Personality ${match.personalityFit!.round()}%'),
+                if (match.codingFit != null) Tag('Coding ${match.codingFit!.round()}%'),
+                if (match.growthOutlook != null) Tag('Growth ${match.growthOutlook}/5', color: Brand.info),
+              ]),
+            ],
             if (match.gaps.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text('${match.gaps.length} skill gap${match.gaps.length == 1 ? '' : 's'} to close',

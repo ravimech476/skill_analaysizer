@@ -317,6 +317,15 @@ export const FEATURES: Feature[] = [
     ready: true,
   },
   {
+    key: 'knowledgebase',
+    path: '/knowledge-base',
+    permissions: ['kb.manage'],
+    audiences: ['admin', 'staff'],
+    label: same('Knowledge Base'),
+    description: same('Documents the AI assistant can answer from: syllabus, notes and question papers'),
+    ready: true,
+  },
+  {
     key: 'notifications',
     path: '/notifications',
     permissions: ['notification.view'],

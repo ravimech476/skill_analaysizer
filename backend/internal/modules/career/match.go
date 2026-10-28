@@ -69,9 +69,15 @@ type Match struct {
 	Strengths     []SkillStanding `json:"strengths"`
 	Gaps          []SkillStanding `json:"gaps"`
 	Explanation   string          `json:"explanation"`
-	ComputedAt    time.Time       `json:"computed_at"`
-	IsStale       bool            `json:"is_stale"`
-	Feedback      *Feedback       `json:"feedback"`
+	// Fit says how well the role suits the student's interests, personality and coding record. It is nil
+	// until they have taken a questionnaire. The outlook is indicative and set by the placement cell.
+	Fit           *FitDetail `json:"fit"`
+	HollandCode   *string    `json:"holland_code"`
+	GrowthOutlook *int       `json:"growth_outlook"`
+	GrowthNote    *string    `json:"growth_note"`
+	ComputedAt    time.Time  `json:"computed_at"`
+	IsStale       bool       `json:"is_stale"`
+	Feedback      *Feedback  `json:"feedback"`
 }
 
 type Feedback struct {
@@ -101,6 +107,10 @@ func (h *Handler) evaluate(ctx context.Context, studentID int64) ([]*Match, erro
 		return nil, err
 	}
 	scores := blended[studentID]
+	fitProfile, err := h.fitProfile(ctx, studentID)
+	if err != nil {
+		return nil, err
+	}
 
 	rows, err := h.db.Query(ctx, selectCareer+` WHERE c.is_active`)
 	if err != nil {
@@ -133,6 +143,7 @@ func (h *Handler) evaluate(ctx context.Context, studentID int64) ([]*Match, erro
 	for _, ca := range careers {
 		m := &Match{CareerID: ca.ID, Code: ca.Code, Name: ca.Name, Domain: ca.Domain, Description: ca.Description,
 			AvgPackage: ca.AvgPackage, MinCGPA: ca.MinCGPA, ComputedAt: now,
+			HollandCode: ca.HollandCode, GrowthOutlook: ca.GrowthOutlook, GrowthNote: ca.GrowthNote,
 			Strengths: []SkillStanding{}, Gaps: []SkillStanding{}}
 		coreMet := true
 		var got, total float64
@@ -161,7 +172,12 @@ func (h *Handler) evaluate(ctx context.Context, studentID int64) ([]*Match, erro
 			m.SkillScore = round2(got / total * 100)
 		}
 		m.AcademicScore = round2(math.Min(cgpa*10, 100))
-		m.FinalScore = round2(skillW*m.SkillScore + academicW*m.AcademicScore)
+		code := ""
+		if ca.HollandCode != nil {
+			code = *ca.HollandCode
+		}
+		m.Fit = Evaluate(fitProfile, code, ca.KeyTraits, ca.CodingRelevance)
+		m.FinalScore = Blend(round2(skillW*m.SkillScore+academicW*m.AcademicScore), m.Fit.Score)
 		// Biggest gap first, core requirements ahead of optional ones.
 		sort.SliceStable(m.Gaps, func(i, j int) bool {
 			if m.Gaps[i].IsCore != m.Gaps[j].IsCore {
@@ -198,6 +214,47 @@ func (h *Handler) evaluate(ctx context.Context, studentID int64) ([]*Match, erro
 		m.Rank = i + 1
 	}
 	return out, nil
+}
+
+// fitProfile gathers the interest and personality scores from the student's latest questionnaires
+// and their verified programming index.
+func (h *Handler) fitProfile(ctx context.Context, studentID int64) (FitProfile, error) {
+	p := FitProfile{Traits: map[string]float64{}}
+	rows, err := h.db.Query(ctx, `
+		SELECT DISTINCT ON (kind) scores FROM student_assessments
+		WHERE student_id = $1 AND is_active AND kind IN ('personality', 'interests')
+		ORDER BY kind, id DESC`, studentID)
+	if err != nil {
+		return p, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw []byte
+		if err := rows.Scan(&raw); err != nil {
+			return p, err
+		}
+		var stored struct {
+			Traits []struct {
+				Key   string  `json:"key"`
+				Score float64 `json:"score"`
+			} `json:"traits"`
+		}
+		if json.Unmarshal(raw, &stored) == nil {
+			for _, t := range stored.Traits {
+				p.Traits[t.Key] = t.Score
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return p, err
+	}
+	rows.Close()
+	var coding *float64
+	if err := h.db.QueryRow(ctx, `SELECT coding_score::float8 FROM student_profiles WHERE user_id = $1`, studentID).Scan(&coding); err != nil && !dbutil.IsNoRows(err) {
+		return p, err
+	}
+	p.Coding = coding
+	return p, nil
 }
 
 // attachCourses hangs up to three courses off each gap, so every gap comes with a next step.
@@ -275,6 +332,9 @@ func explain(m *Match, cgpa float64) string {
 	if cgpa < m.MinCGPA {
 		parts = append(parts, fmt.Sprintf("CGPA %.2f is below the %.2f usually expected", cgpa, m.MinCGPA))
 	}
+	if m.Fit != nil {
+		parts = append(parts, m.Fit.Notes...)
+	}
 	return capitalise(strings.Join(parts, "; ")) + "."
 }
 
@@ -316,11 +376,12 @@ func (h *Handler) store(ctx context.Context, studentID, actorID int64, list []*M
 		for _, m := range list {
 			gaps, _ := json.Marshal(m.Gaps)
 			strengths, _ := json.Marshal(m.Strengths)
+			fit, _ := json.Marshal(m.Fit)
 			batch.Queue(`INSERT INTO career_matches (student_id, career_id, rank, skill_score, academic_score, final_score,
-				readiness, gaps, strengths, explanation, computed_at, created_by, updated_by)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)`,
+				readiness, gaps, strengths, explanation, computed_at, fit, created_by, updated_by)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)`,
 				studentID, m.CareerID, m.Rank, m.SkillScore, m.AcademicScore, m.FinalScore, m.Readiness,
-				gaps, strengths, m.Explanation, m.ComputedAt, actorID)
+				gaps, strengths, m.Explanation, m.ComputedAt, fit, actorID)
 		}
 		return tx.SendBatch(ctx, batch).Close()
 	})
@@ -331,7 +392,8 @@ func (h *Handler) cached(ctx context.Context, studentID int64) ([]*Match, error)
 	rows, err := h.db.Query(ctx, `
 		SELECT m.career_id, c.code, c.name, c.domain, c.description, c.avg_package::float8, c.min_cgpa::float8,
 		       m.rank, m.skill_score::float8, m.academic_score::float8, m.final_score::float8, m.readiness,
-		       m.strengths, m.gaps, m.explanation, m.computed_at,
+		       m.strengths, m.gaps, m.explanation, m.computed_at, m.fit,
+		       c.holland_code, c.growth_outlook::int, c.growth_note,
 		       f.rating, f.is_useful, f.comment, f.created_at
 		FROM career_matches m
 		JOIN careers c ON c.id = m.career_id AND c.is_active
@@ -345,15 +407,22 @@ func (h *Handler) cached(ctx context.Context, studentID int64) ([]*Match, error)
 	out := []*Match{}
 	for rows.Next() {
 		m := &Match{}
-		var strengths, gaps []byte
+		var strengths, gaps, fit []byte
 		var rating *int
 		var useful *bool
 		var comment *string
 		var fbAt *time.Time
 		if err := rows.Scan(&m.CareerID, &m.Code, &m.Name, &m.Domain, &m.Description, &m.AvgPackage, &m.MinCGPA,
 			&m.Rank, &m.SkillScore, &m.AcademicScore, &m.FinalScore, &m.Readiness,
-			&strengths, &gaps, &m.Explanation, &m.ComputedAt, &rating, &useful, &comment, &fbAt); err != nil {
+			&strengths, &gaps, &m.Explanation, &m.ComputedAt, &fit, &m.HollandCode, &m.GrowthOutlook, &m.GrowthNote,
+			&rating, &useful, &comment, &fbAt); err != nil {
 			return nil, err
+		}
+		if len(fit) > 0 && string(fit) != "null" { // rows stored before fit existed have none
+			var d FitDetail
+			if json.Unmarshal(fit, &d) == nil {
+				m.Fit = &d
+			}
 		}
 		m.Strengths, m.Gaps = []SkillStanding{}, []SkillStanding{}
 		_ = json.Unmarshal(strengths, &m.Strengths)

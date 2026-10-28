@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { FormInstance } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -18,6 +19,8 @@ export interface MasterField {
   min?: number;
   max?: number;
   extra?: string;
+  /** Extra content shown under this field in the form (for example a "Suggest" button that reads other fields). */
+  after?: (form: FormInstance) => ReactNode;
 }
 
 interface Props<T> {
@@ -152,8 +155,8 @@ export default function MasterCrud<T extends { id: number; is_active: boolean }>
         {error && <Alert type="error" title={error} showIcon style={{ marginBottom: 16 }} />}
         <Form form={form} layout="vertical" onFinish={(v) => save.mutate(v)} requiredMark="optional">
           {fields.map((f) => (
+            <Fragment key={f.name}>
             <Form.Item
-              key={f.name}
               name={f.name}
               label={f.label}
               extra={f.extra}
@@ -175,6 +178,8 @@ export default function MasterCrud<T extends { id: number; is_active: boolean }>
                 <Input />
               )}
             </Form.Item>
+            {f.after?.(form)}
+            </Fragment>
           ))}
         </Form>
       </Modal>

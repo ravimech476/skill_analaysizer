@@ -371,6 +371,34 @@ const features = <Feature>[
     },
   ),
   Feature(
+    key: 'chat',
+    icon: Icons.smart_toy_outlined,
+    permissions: ['chat.use'],
+    label: {
+      Audience.admin: 'AI Assistant',
+      Audience.staff: 'AI Assistant',
+      Audience.student: 'AI Assistant',
+      Audience.parent: 'AI Assistant',
+    },
+    description: {
+      Audience.admin: 'Ask questions about skills, placements and interview prep',
+      Audience.staff: 'Ask questions about skills, placements and interview prep',
+      Audience.student: 'Ask about your marks, skills and placements',
+      Audience.parent: "Ask about your child's progress",
+    },
+  ),
+  Feature(
+    key: 'knowledgebase',
+    icon: Icons.menu_book_outlined,
+    permissions: ['kb.manage'],
+    audiences: [Audience.admin, Audience.staff],
+    label: {Audience.admin: 'Knowledge Base', Audience.staff: 'Knowledge Base'},
+    description: {
+      Audience.admin: 'Documents the AI assistant can answer from: syllabus, notes and question papers',
+      Audience.staff: 'Documents the AI assistant can answer from: syllabus, notes and question papers',
+    },
+  ),
+  Feature(
     key: 'notifications',
     icon: Icons.notifications_none,
     permissions: ['notification.view'],
@@ -381,12 +409,12 @@ const features = <Feature>[
 
 /// Sidebar sections, in order. Anything not listed falls into "More".
 const menuGroups = <String, List<String>>{
-  'Overview': ['dashboard', 'reports'],
+  'Overview': ['dashboard', 'chat', 'reports'],
   'Academics': ['departments', 'academicyears', 'classes', 'subjects', 'examtypes', 'marks', 'attendance', 'copo'],
   'People': ['students', 'staff'],
   'Skill Analyzer': ['studentanalysis', 'classanalysis', 'deptanalysis', 'readiness', 'careers', 'learningpath'],
   'Placement': ['companies', 'drives', 'history'],
-  'Resources': ['interviewbank', 'studymaterials', 'questionbank'],
+  'Resources': ['interviewbank', 'studymaterials', 'questionbank', 'knowledgebase'],
   'Settings': ['users', 'roles', 'skillmaster', 'threshold', 'notifications'],
 };
 

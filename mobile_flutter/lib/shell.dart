@@ -12,6 +12,7 @@ import 'screens/classes_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/departments_screen.dart';
 import 'screens/marks_screen.dart';
+import 'screens/chat_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/companies_screen.dart';
 import 'screens/placement_history_screen.dart';
@@ -31,6 +32,7 @@ import 'screens/exam_types_screen.dart';
 import 'screens/attendance_screen.dart';
 import 'screens/co_po_screen.dart';
 import 'screens/interview_bank_screen.dart';
+import 'screens/knowledge_base_screen.dart';
 import 'screens/placement_readiness_screen.dart';
 import 'screens/question_bank_screen.dart';
 import 'screens/study_materials_screen.dart';
@@ -70,7 +72,7 @@ Widget screenFor(String key) {
     case 'reports':
       return const ReportsScreen();
     case 'threshold':
-      return const ThresholdScreen();
+      return const SkillConfigScreen();
     case 'subjects':
       return const SubjectsScreen();
     case 'examtypes':
@@ -99,6 +101,10 @@ Widget screenFor(String key) {
       return const StudyMaterialsScreen();
     case 'notifications':
       return const NotificationsScreen();
+    case 'chat':
+      return const ChatScreen();
+    case 'knowledgebase':
+      return const KnowledgeBaseScreen();
     default:
       return const Center(child: Text('Coming soon'));
   }
@@ -126,6 +132,13 @@ class _AppShellState extends State<AppShell> {
       appBar: AppBar(
         title: Text(title),
         actions: [
+          // A shortcut to the assistant from every other screen (screens keep their own "add" buttons free).
+          if (session.can(['chat.use']) && feature.key != 'chat')
+            IconButton(
+              tooltip: 'AI Assistant',
+              onPressed: () => setState(() => _current = 'chat'),
+              icon: const Icon(Icons.smart_toy_outlined),
+            ),
           _BellButton(onOpen: () => setState(() => _current = 'notifications')),
           _ProfileButton(session: session),
           const SizedBox(width: 4),

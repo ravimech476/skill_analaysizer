@@ -53,9 +53,15 @@ var Rules = map[string]Rule{
 	"certificate":             {pdfImages, 5 << 20, "a PDF or image up to 5 MB"},
 	"student_document":        {pdfImages, 5 << 20, "a PDF or image up to 5 MB"},
 	"notification_attachment": {pdfImages, 10 << 20, "a PDF or image up to 10 MB"},
+	"study_material":          {Types: []string{"application/pdf", docxType, pptxType}, MaxBytes: 15 << 20, Label: "a PDF, Word (.docx) or PowerPoint (.pptx) file up to 15 MB"},
+	"interview_document":      {Types: []string{"application/pdf", docxType, pptxType}, MaxBytes: 15 << 20, Label: "a PDF, Word (.docx) or PowerPoint (.pptx) file up to 15 MB"},
+	"question_paper":          {Types: []string{"application/pdf", docxType, pptxType}, MaxBytes: 15 << 20, Label: "a PDF, Word (.docx) or PowerPoint (.pptx) file up to 15 MB"},
 }
 
-var extFor = map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "application/pdf": ".pdf"}
+// officeCategories accept Word (.docx) and PowerPoint (.pptx) files, which are zips and so need a closer look.
+var officeCategories = map[string]bool{"study_material": true, "interview_document": true, "question_paper": true}
+
+var extFor = map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "application/pdf": ".pdf", docxType: ".docx", pptxType: ".pptx"}
 
 // ---- links ----
 
@@ -169,6 +175,11 @@ func (s *Service) Upload(ctx context.Context, actorID int64, category string, fh
 	if i := strings.Index(ctype, ";"); i > 0 {
 		ctype = ctype[:i]
 	}
+	if officeCategories[category] && ctype == "application/zip" {
+		if t := sniffOffice(fh.Filename, data); t != "" {
+			ctype = t
+		}
+	}
 	if !contains(rule.Types, ctype) {
 		return nil, response.BadRequest("This file type is not allowed here. Upload " + rule.Label)
 	}
@@ -272,4 +283,24 @@ func cleanName(name, ext string) string {
 		base = base[:120]
 	}
 	return base + ext
+}
+
+// Read returns the name and bytes of a stored file, for modules that need to look inside it
+// (for example to index a study material for the AI assistant).
+func (s *Service) Read(ctx context.Context, id int64) (string, []byte, error) {
+	var name, key string
+	err := s.db.QueryRow(ctx, `SELECT original_name, storage_key FROM files WHERE id = $1 AND is_active AND storage_key <> ''`, id).Scan(&name, &key)
+	if dbutil.IsNoRows(err) {
+		return "", nil, response.NotFound("File not found")
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	f, err := s.store.Open(key)
+	if err != nil {
+		return "", nil, response.NotFound("File not found")
+	}
+	defer f.Close()
+	data, err := io.ReadAll(io.LimitReader(f, 64<<20))
+	return name, data, err
 }

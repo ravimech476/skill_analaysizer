@@ -116,6 +116,13 @@ class _ReadinessBody extends StatelessWidget {
                   color: Brand.success,
                   hint: 'Score >= 70%',
                 ),
+                StatTile(
+                  label: 'Needing attention',
+                  value: '${asInt((data['at_risk'] as Map?)?['high']) + asInt((data['at_risk'] as Map?)?['medium'])}',
+                  icon: Icons.warning_amber_outlined,
+                  color: asInt((data['at_risk'] as Map?)?['high']) > 0 ? Brand.error : Brand.warning,
+                  hint: '${asInt((data['at_risk'] as Map?)?['high'])} high risk',
+                ),
               ]),
             ),
             const SizedBox(height: 10),
@@ -152,7 +159,7 @@ class _ReadinessBody extends StatelessWidget {
                           const SizedBox(height: 6),
                           _LegendRow(
                             color: Brand.error,
-                            label: 'At Risk (<50%)',
+                            label: 'Low (<50%)',
                             count: students.where((s) => asDouble(s['score']) < 50).length,
                           ),
                         ],
@@ -217,6 +224,29 @@ class _ReadinessBody extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                if (text(s['risk_level']) != 'none' && text(s['risk_level']).isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text.rich(TextSpan(children: [
+                                      TextSpan(
+                                        text: text(s['risk_level']) == 'high' ? 'High risk  ' : 'Watch  ',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: text(s['risk_level']) == 'high' ? Brand.error : Brand.warning,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: maps(s['risk_reasons']).map((r) => text(r['text'])).join('. '),
+                                        style: const TextStyle(fontSize: 12, color: Brand.textSoft),
+                                      ),
+                                    ])),
+                                  ),
+                                if (s['change'] != null)
+                                  Text(
+                                    '${asDouble(s['change']) >= 0 ? '+' : ''}${s['change']} since last month',
+                                    style: TextStyle(fontSize: 11.5, color: asDouble(s['change']) < 0 ? Brand.error : Brand.textSoft),
+                                  ),
                               ],
                             ),
                           ),

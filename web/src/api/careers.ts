@@ -140,6 +140,11 @@ export interface CareerMatch {
   strengths: SkillStanding[];
   gaps: SkillStanding[];
   explanation: string;
+  /** How well the role suits the student's interests, personality and coding record; null until a questionnaire is taken. */
+  fit: { interest: number | null; personality: number | null; coding: number | null; score: number | null; notes: string[] } | null;
+  holland_code: string | null;
+  growth_outlook: number | null;
+  growth_note: string | null;
   computed_at: string;
   is_stale: boolean;
   feedback: { rating: number; is_useful: boolean; comment: string | null; created_at: string } | null;
@@ -193,6 +198,26 @@ export const scoresApi = {
   /** Marks a skill's certificate as checked. Returns the student's skills, as the skills API does. */
   verifyCertificate: (studentId: number, skillId: number, verified: boolean) =>
     data<unknown>(api.put(`/students/${studentId}/skills/${skillId}/verify`, { verified })),
+};
+
+export interface PrepPlan {
+  career: string;
+  career_id: number;
+  readiness: Readiness;
+  skills: { skill: string; level: number; needed: number; is_core: boolean; hours: number; courses: NonNullable<SkillStanding['courses']> }[];
+  practice: { area: string; why: string; do: string }[];
+  projects: { title: string; description: string; level: number }[];
+  habits: { area: string; why: string; do: string }[];
+  alternatives: { career: string; interest: number; score: number }[];
+  hours_per_week: number;
+  total_hours: number;
+  weeks: { number: number; hours: number; study: string[] }[];
+  more_courses: number;
+}
+
+export const prepApi = {
+  plan: (studentId: number, params: { career_id?: number; hours?: number } = {}) =>
+    data<PrepPlan>(api.get(`/students/${studentId}/prep-plan`, { params })),
 };
 
 export const coursesApi = {

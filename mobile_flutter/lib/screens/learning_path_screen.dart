@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api/client.dart';
 import '../api/endpoints.dart';
 import '../api/models.dart';
+import '../api/talent_api.dart';
 import '../auth/access.dart';
 import '../auth/session.dart';
 import '../theme.dart';
@@ -193,8 +194,18 @@ class _CoursesBodyState extends State<_CoursesBody> {
       onRefresh: _load,
       child: ListView.builder(
         padding: const EdgeInsets.all(12),
-        itemCount: _courses!.length,
-        itemBuilder: (context, i) {
+        itemCount: _courses!.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _PrepPlanView(studentId: widget.studentId),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(2, 6, 2, 8),
+                child: Text('All recommended courses', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+            ]);
+          }
+          final i = index - 1;
           final gc = _courses![i];
           final c = gc.course;
           return Card(
@@ -238,6 +249,108 @@ class _CoursesBodyState extends State<_CoursesBody> {
       ),
     );
   }
+}
+
+/// The placement preparation plan: skills to build, a weekly schedule, practice, habits and project ideas.
+class _PrepPlanView extends StatefulWidget {
+  const _PrepPlanView({required this.studentId});
+  final int studentId;
+
+  @override
+  State<_PrepPlanView> createState() => _PrepPlanViewState();
+}
+
+class _PrepPlanViewState extends State<_PrepPlanView> {
+  int? _careerId;
+
+  Widget _items(List<Map<String, dynamic>> rows, String empty) {
+    if (rows.isEmpty) return Text(empty, style: const TextStyle(fontSize: 13, color: Brand.muted));
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      for (final a in rows)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(text(a['area']), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+            Text(text(a['why']), style: const TextStyle(fontSize: 12.5, color: Brand.textSoft)),
+            Text(text(a['do']), style: const TextStyle(fontSize: 13)),
+          ]),
+        ),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) => AsyncView<Map<String, dynamic>>(
+        refreshKey: '${widget.studentId}|$_careerId',
+        scrollable: false,
+        load: () => talentApi.prepPlan(widget.studentId, careerId: _careerId),
+        builder: (context, p, _) {
+          final skills = maps(p['skills']);
+          final weeks = maps(p['weeks']);
+          final projects = maps(p['projects']);
+          final alts = maps(p['alternatives']);
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            SectionCard(
+              title: 'Placement plan for ${text(p['career'])}',
+              subtitle: 'Built from your record at ${asInt(p['hours_per_week'])} study hours a week.',
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (alts.isNotEmpty) ...[
+                  NoteBanner(
+                    title: 'Your interests point more towards ${alts.map((a) => text(a['career'])).join(' or ')}',
+                    color: Brand.info,
+                    icon: Icons.info_outline,
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                const Text('Skills to build', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const SizedBox(height: 4),
+                if (skills.isEmpty)
+                  const Text('You meet every skill requirement for this career.', style: TextStyle(fontSize: 13, color: Brand.muted)),
+                for (final s in skills)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text.rich(TextSpan(children: [
+                      TextSpan(text: text(s['skill']), style: const TextStyle(fontWeight: FontWeight.w600)),
+                      TextSpan(text: '  level ${asInt(s['level'])} of ${asInt(s['needed'])} needed', style: const TextStyle(color: Brand.textSoft, fontSize: 12.5)),
+                      for (final c in maps(s['courses']).take(1)) TextSpan(text: '\n${text(c['title'])}${c['duration_hours'] != null ? ', ${c['duration_hours']}h' : ''}', style: const TextStyle(fontSize: 13)),
+                    ])),
+                  ),
+                const SizedBox(height: 10),
+                const Text('Weekly schedule', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const SizedBox(height: 4),
+                if (weeks.isEmpty) const Text('Nothing to schedule.', style: TextStyle(fontSize: 13, color: Brand.muted)),
+                for (final w in weeks)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('Week ${asInt(w['number'])} (${asInt(w['hours'])}h): ${((w['study'] ?? []) as List).join('; ')}', style: const TextStyle(fontSize: 13)),
+                  ),
+                if (asInt(p['more_courses']) > 0)
+                  Text('${asInt(p['more_courses'])} more course(s) follow after these weeks.', style: const TextStyle(fontSize: 12, color: Brand.textSoft)),
+              ]),
+            ),
+            const SizedBox(height: 10),
+            SectionCard(title: 'Practice', child: _items(maps(p['practice']), 'Nothing urgent. Keep up your practice.')),
+            const SizedBox(height: 10),
+            SectionCard(title: 'Study habits', child: _items(maps(p['habits']), 'Your study habits look strong.')),
+            const SizedBox(height: 10),
+            SectionCard(
+              title: 'Projects to build',
+              child: projects.isEmpty
+                  ? const Text('No project ideas for this career yet.', style: TextStyle(fontSize: 13, color: Brand.muted))
+                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      for (final i in projects)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(text(i['title']), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                            Text(text(i['description']), style: const TextStyle(fontSize: 12.5, color: Brand.textSoft)),
+                          ]),
+                        ),
+                    ]),
+            ),
+            const SizedBox(height: 10),
+          ]);
+        },
+      );
 }
 
 class _GapCourse {

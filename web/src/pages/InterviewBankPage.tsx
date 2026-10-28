@@ -1,8 +1,11 @@
-import { Card, Tag } from 'antd';
+import { Card, Tabs, Tag } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { mastersApi } from '../api/phase2';
 import type { Company } from '../api/placement';
+import { useAuth } from '../auth/AuthContext';
+import InterviewDocuments from '../components/InterviewDocuments';
 import MasterCrud from '../components/MasterCrud';
+import { InterviewUpload } from './BulkUploadPage';
 
 const CATEGORIES = [
   { value: 'technical', label: 'Technical' },
@@ -84,9 +87,18 @@ function InterviewCrud() {
 }
 
 export default function InterviewBankPage() {
+  const { can } = useAuth();
+  // Students see the documents. The one-by-one question list and the Excel import are for staff.
+  const staff = can('interview.create');
   return (
     <Card>
-      <InterviewCrud />
+      <Tabs
+        items={[
+          { key: 'documents', label: 'Documents', children: <InterviewDocuments /> },
+          ...(staff ? [{ key: 'questions', label: 'Questions', children: <InterviewCrud /> }] : []),
+          ...(staff ? [{ key: 'import', label: 'Import questions', children: <InterviewUpload /> }] : []),
+        ]}
+      />
     </Card>
   );
 }

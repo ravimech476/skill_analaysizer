@@ -1,9 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../api/endpoints.dart';
 import '../api/models.dart';
+import '../auth/session.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'skills_screen.dart';
+
+/// Skill Analysis Config: the scoring settings, and which skills each subject teaches (the link that lets marks
+/// move a skill score, with AI-suggested mappings for staff to review).
+class SkillConfigScreen extends StatelessWidget {
+  const SkillConfigScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tabs = <(String, Widget)>[
+      ('Scoring', const ThresholdScreen()),
+      if (context.watch<Session>().can(['subject.view'])) ('Subject skills', const SubjectSkillMapping()),
+    ];
+    if (tabs.length == 1) return tabs.first.$2;
+    return DefaultTabController(
+      length: tabs.length,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: TabBar(tabs: tabs.map((t) => Tab(text: t.$1)).toList()),
+        body: TabBarView(children: tabs.map((t) => t.$2).toList()),
+      ),
+    );
+  }
+}
 
 class ThresholdScreen extends StatefulWidget {
   const ThresholdScreen({super.key});

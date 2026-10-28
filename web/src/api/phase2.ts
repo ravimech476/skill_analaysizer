@@ -252,7 +252,7 @@ export interface Page {
 
 // ---- generic masters ----
 
-export type MasterPath = 'departments' | 'academic-years' | 'subjects' | 'exam-types' | 'grade-scales' | 'skills' | 'companies' | 'courses' | 'interview-questions' | 'study-materials' | 'attendance' | 'program-outcomes' | 'course-outcomes' | 'co-po-mappings' | 'question-bank';
+export type MasterPath = 'departments' | 'academic-years' | 'subjects' | 'exam-types' | 'grade-scales' | 'skills' | 'companies' | 'courses' | 'interview-questions' | 'study-materials' | 'attendance' | 'program-outcomes' | 'course-outcomes' | 'co-po-mappings' | 'question-bank' | 'interview-documents' | 'question-papers';
 
 export const mastersApi = {
   list: <T,>(path: MasterPath | 'year-levels' | 'semesters', params: Record<string, unknown> = { all: true }) =>
@@ -302,6 +302,14 @@ export const studentsApi = {
   removeParent: (id: number, parentId: number) => data<Student>(api.delete(`/students/${id}/parents/${parentId}`)),
   parents: (search: string) => data<ParentListItem[]>(api.get('/parents', { params: { search, page_size: 20 } })),
 };
+
+/** Posts one Excel sheet to a bulk-upload endpoint. A dry run checks every row and saves nothing. */
+function uploadSheet(path: string, file: File, dry_run: boolean) {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('dry_run', String(dry_run));
+  return data<UploadJob>(api.post(`/bulk-upload/${path}`, form, { timeout: 300_000 }));
+}
 
 export const bulkApi = {
   template: () => api.get<Blob>('/bulk-upload/students/template', { responseType: 'blob' }).then((r) => r.data),
@@ -366,6 +374,14 @@ export const bulkApi = {
     form.append('dry_run', String(dry_run));
     return data<UploadJob>(api.post('/bulk-upload/placement-drives', form, { timeout: 300_000 }));
   },
+
+  // Interview bank, study materials and question bank
+  interviewTemplate: () => api.get<Blob>('/bulk-upload/interview-questions/template', { responseType: 'blob' }).then((r) => r.data),
+  uploadInterview: (file: File, dry_run: boolean) => uploadSheet('interview-questions', file, dry_run),
+  materialsTemplate: () => api.get<Blob>('/bulk-upload/study-materials/template', { responseType: 'blob' }).then((r) => r.data),
+  uploadMaterials: (file: File, dry_run: boolean) => uploadSheet('study-materials', file, dry_run),
+  questionsTemplate: () => api.get<Blob>('/bulk-upload/question-bank/template', { responseType: 'blob' }).then((r) => r.data),
+  uploadQuestions: (file: File, dry_run: boolean) => uploadSheet('question-bank', file, dry_run),
 };
 
 /** Save a Blob as a file download. */

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api/endpoints.dart';
+import '../api/knowledge_api.dart';
 import '../api/models.dart';
 import '../auth/session.dart';
 import '../main.dart';
@@ -622,6 +623,31 @@ class _MappingForm extends StatefulWidget {
 class _MappingFormState extends State<_MappingForm> {
   late final List<Map<String, dynamic>> _rows = List.of(widget.initial);
   bool _busy = false;
+  bool _suggesting = false;
+  Map<String, dynamic>? _suggestion;
+
+  /// The model proposes skills; they are added as rows for staff to review. Nothing is saved until "Save mapping".
+  Future<void> _suggest() async {
+    setState(() => _suggesting = true);
+    try {
+      final r = await skillSuggestApi.suggestMapping(widget.subjectId);
+      if (!mounted) return;
+      final have = _rows.map((x) => asIntOrNull(x['skill_id'])).toSet();
+      setState(() {
+        _suggestion = r;
+        _rows.removeWhere((x) => x['skill_id'] == null);
+        for (final k in maps(r['skills'])) {
+          if (!have.contains(asIntOrNull(k['skill_id']))) {
+            _rows.add({'skill_id': asIntOrNull(k['skill_id']), 'weight': asDouble(k['weight'])});
+          }
+        }
+      });
+    } catch (e) {
+      if (mounted) toastError(context, e);
+    } finally {
+      if (mounted) setState(() => _suggesting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Column(
@@ -632,6 +658,25 @@ class _MappingFormState extends State<_MappingForm> {
             'Saving recomputes the scores of every student with marks in it.',
             style: TextStyle(fontSize: 12.5, color: Brand.textSoft),
           ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _suggesting ? null : _suggest,
+            icon: _suggesting
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.lightbulb_outline, size: 18),
+            label: Text(_suggesting ? 'Asking the AI…' : 'Suggest skills with AI'),
+          ),
+          if (_suggestion != null) ...[
+            const SizedBox(height: 8),
+            NoteBanner(
+              title: _suggestion!['used_syllabus'] == true ? 'Based on the uploaded syllabus for this subject.' : 'Based on the subject name only. Please check these carefully.',
+              body: maps(_suggestion!['skills']).isEmpty
+                  ? 'The AI found no clear match in the skill list. Nothing was added.'
+                  : maps(_suggestion!['skills']).map((k) => '${text(k['skill'])} (weight ${k['weight']})${text(k['reason']).isEmpty ? '' : ': ${text(k['reason'])}'}').join('\n'),
+              color: _suggestion!['used_syllabus'] == true ? Brand.info : Brand.warning,
+              icon: Icons.info_outline,
+            ),
+          ],
           const SizedBox(height: 14),
           ..._rows.asMap().entries.map((e) {
             final i = e.key;
@@ -653,6 +698,7 @@ class _MappingFormState extends State<_MappingForm> {
                   Expanded(
                     flex: 2,
                     child: TextFormField(
+                      key: ValueKey('weight-$i-${_rows[i]['skill_id']}'),
                       initialValue: '${_rows[i]['weight'] ?? 1}',
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(labelText: 'weight'),

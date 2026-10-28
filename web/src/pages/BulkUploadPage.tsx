@@ -9,7 +9,22 @@ import { uploadsApi } from '../api/reports';
 import { useClasses } from '../api/lookups';
 import { useAuth } from '../auth/AuthContext';
 
-const TYPE_LABEL: Record<string, string> = { students: 'Students', staff: 'Staff', skills: 'Skills', marks: 'Marks', departments: 'Departments', subjects: 'Subjects', companies: 'Companies' };
+const TYPE_LABEL: Record<string, string> = {
+  students: 'Students',
+  staff: 'Staff',
+  skills: 'Skills',
+  marks: 'Marks',
+  departments: 'Departments',
+  subjects: 'Subjects',
+  companies: 'Companies',
+  exam_types: 'Exam types',
+  academic_years: 'Academic years',
+  skill_master: 'Skill list',
+  placement_drives: 'Placement drives',
+  interview_questions: 'Interview bank',
+  study_materials: 'Study materials',
+  question_bank: 'Question bank',
+};
 
 export function JobResult({ job, codeLabel = 'Register no', okLabel = 'Created' }: { job: UploadJob; codeLabel?: string; okLabel?: string }) {
   const allOk = job.failed_rows === 0;
@@ -391,6 +406,62 @@ export function PlacementDrivesUpload() {
   );
 }
 
+function TemplateButton({ load, filename }: { load: () => Promise<Blob>; filename: string }) {
+  return (
+    <Button icon={<DownloadOutlined />} onClick={() => load().then((b) => saveBlob(b, filename)).catch((e) => message.error(errorMessage(e)))}>
+      Download template (.xlsx)
+    </Button>
+  );
+}
+
+export function InterviewUpload() {
+  const qc = useQueryClient();
+  return (
+    <UploadPanel
+      title="Interview questions"
+      codeLabel="Company"
+      okLabel="Added"
+      actionLabel="Import questions"
+      help="One row per question. Company must match a name on the Companies sheet (leave it empty for a general question). Category is technical, aptitude, hr, coding, group_discussion or case_study. A question that already exists is skipped."
+      template={<TemplateButton load={bulkApi.interviewTemplate} filename="interview_questions_upload_template.xlsx" />}
+      run={(file, dry_run) => bulkApi.uploadInterview(file, dry_run)}
+      onSaved={() => qc.invalidateQueries({ queryKey: ['master', 'interview-questions'] })}
+    />
+  );
+}
+
+export function MaterialsUpload() {
+  const qc = useQueryClient();
+  return (
+    <UploadPanel
+      title="Study materials"
+      codeLabel="Subject"
+      okLabel="Added"
+      actionLabel="Import materials"
+      help="One row per material, with a title and an optional link. Files (PDF, Word, slides) are attached afterwards on the Study Materials page. Subject code must match the Subjects sheet."
+      template={<TemplateButton load={bulkApi.materialsTemplate} filename="study_materials_upload_template.xlsx" />}
+      run={(file, dry_run) => bulkApi.uploadMaterials(file, dry_run)}
+      onSaved={() => qc.invalidateQueries({ queryKey: ['master', 'study-materials'] })}
+    />
+  );
+}
+
+export function QuestionsUpload() {
+  const qc = useQueryClient();
+  return (
+    <UploadPanel
+      title="Question bank"
+      codeLabel="Subject"
+      okLabel="Added"
+      actionLabel="Import questions"
+      help="One row per question. Leave Bloom's level empty to set it automatically from the question's action verb (Define → Remember, Design → Create). Subject code and exam type must match the sheets in the template."
+      template={<TemplateButton load={bulkApi.questionsTemplate} filename="question_bank_upload_template.xlsx" />}
+      run={(file, dry_run) => bulkApi.uploadQuestions(file, dry_run)}
+      onSaved={() => qc.invalidateQueries({ queryKey: ['master', 'question-bank'] })}
+    />
+  );
+}
+
 function History() {
   const [page, setPage] = useState(1);
   const [type, setType] = useState<string>();
@@ -440,7 +511,7 @@ function History() {
           })}
           columns={[
             { title: 'When', dataIndex: 'created_at', render: (v) => dayjs(v).format('DD MMM YYYY, HH:mm') },
-            { title: 'Type', dataIndex: 'upload_type', width: 90, render: (v) => <Tag>{TYPE_LABEL[v] ?? v}</Tag> },
+            { title: 'Type', dataIndex: 'upload_type', width: 130, render: (v) => <Tag>{TYPE_LABEL[v] ?? v}</Tag> },
             { title: 'File', dataIndex: 'file_name', render: (v, j) => <Space>{v}{j.dry_run && <Tag color="blue">dry run</Tag>}</Space> },
             { title: 'By', dataIndex: 'created_by_name' },
             { title: 'Rows', dataIndex: 'total_rows', width: 70 },

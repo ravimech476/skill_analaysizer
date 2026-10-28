@@ -41,6 +41,13 @@ type Config struct {
 	// OTP delivery (see package sms).
 	SMS sms.Config
 
+	// Local Ollama server behind the AI chat assistant.
+	OllamaURL     string
+	OllamaModel   string
+	OllamaTimeout time.Duration
+	// Embedding model used to index and search the knowledge base.
+	OllamaEmbedModel string
+
 	// TrustedProxies are the reverse proxies whose X-Forwarded-For is believed (empty = none).
 	TrustedProxies []string
 	// Requests per minute per client IP: all API calls, and the sign-in / OTP endpoints.
@@ -87,6 +94,10 @@ func Load() (*Config, error) {
 			WebhookURL:    env("SMS_WEBHOOK_URL", ""),
 			WebhookToken:  env("SMS_WEBHOOK_TOKEN", ""),
 		},
+		OllamaURL:              strings.TrimRight(env("OLLAMA_URL", "http://localhost:11434"), "/"),
+		OllamaModel:            env("OLLAMA_MODEL", "llama3.2"),
+		OllamaTimeout:          envDuration("OLLAMA_TIMEOUT", 3*time.Minute),
+		OllamaEmbedModel:       env("OLLAMA_EMBED_MODEL", "nomic-embed-text"),
 		TrustedProxies:         splitList(env("TRUSTED_PROXIES", "")),
 		RateLimitPerMinute:     envInt("RATE_LIMIT_PER_MINUTE", 3000),
 		AuthRateLimitPerMinute: envInt("AUTH_RATE_LIMIT_PER_MINUTE", 120),

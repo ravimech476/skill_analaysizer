@@ -31,6 +31,7 @@ import {
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { audienceOf, ROLE_COLORS, visibleFeatures, type Feature } from '../auth/access';
+import ChatWidget from './ChatWidget';
 import NotificationBell from './NotificationBell';
 import { UserAvatar } from './Files';
 import { moduleColor } from '../auth/moduleColors';
@@ -75,7 +76,7 @@ const GROUPS: { title: string; keys: string[] }[] = [
   { title: 'People', keys: ['students', 'staff'] },
   { title: 'Skill Analyzer', keys: ['studentanalysis', 'classanalysis', 'deptanalysis', 'readiness', 'careers', 'learningpath'] },
   { title: 'Placement', keys: ['companies', 'drives', 'history'] },
-  { title: 'Resources', keys: ['interviewbank', 'studymaterials', 'questionbank'] },
+  { title: 'Resources', keys: ['interviewbank', 'studymaterials', 'questionbank', 'knowledgebase'] },
   { title: 'Settings', keys: ['users', 'roles', 'skillmaster', 'threshold', 'notifications'] },
 ];
 
@@ -214,6 +215,7 @@ export default function AppLayout() {
           <Outlet />
         </Layout.Content>
       </Layout>
+      <ChatWidget />
     </Layout>
   );
 }

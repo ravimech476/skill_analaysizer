@@ -29,6 +29,9 @@ const fileRules = <String, FileRule>{
   'certificate': FileRule(['pdf', 'jpg', 'jpeg', 'png', 'webp'], 5, 'PDF or image, up to 5 MB'),
   'student_document': FileRule(['pdf', 'jpg', 'jpeg', 'png', 'webp'], 5, 'PDF or image, up to 5 MB'),
   'notification_attachment': FileRule(['pdf', 'jpg', 'jpeg', 'png', 'webp'], 10, 'PDF or image, up to 10 MB'),
+  'study_material': FileRule(['pdf', 'docx', 'pptx'], 15, 'PDF, Word (.docx) or PowerPoint (.pptx), up to 15 MB'),
+  'interview_document': FileRule(['pdf', 'docx', 'pptx'], 15, 'PDF, Word (.docx) or PowerPoint (.pptx), up to 15 MB'),
+  'question_paper': FileRule(['pdf', 'docx', 'pptx'], 15, 'PDF, Word (.docx) or PowerPoint (.pptx), up to 15 MB'),
 };
 
 /// Picks a file for a category and uploads it. Returns null when the user cancels.

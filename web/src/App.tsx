@@ -37,6 +37,7 @@ const AttendancePage = lazy(() => import('./pages/AttendancePage'));
 const COPOPage = lazy(() => import('./pages/COPOPage'));
 const QuestionBankPage = lazy(() => import('./pages/QuestionBankPage'));
 const PlacementReadinessPage = lazy(() => import('./pages/PlacementReadinessPage'));
+const KnowledgeBasePage = lazy(() => import('./pages/KnowledgeBasePage'));
 
 const PAGES: Record<string, ReactNode> = {
   users: <UsersPage />,
@@ -67,6 +68,7 @@ const PAGES: Record<string, ReactNode> = {
   copo: <COPOPage />,
   questionbank: <QuestionBankPage />,
   readiness: <PlacementReadinessPage />,
+  knowledgebase: <KnowledgeBasePage />,
 };
 
 /** Shown while a page's code chunk is loading. */

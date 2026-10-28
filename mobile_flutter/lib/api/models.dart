@@ -501,6 +501,10 @@ class CareerMatch {
   double get finalScore => asDouble(raw['final_score']);
   String get readiness => text(raw['readiness'], 'explore');
   String get explanation => text(raw['explanation']);
+  double? get interestFit => asDoubleOrNull((raw['fit'] as Map?)?['interest']);
+  double? get personalityFit => asDoubleOrNull((raw['fit'] as Map?)?['personality']);
+  double? get codingFit => asDoubleOrNull((raw['fit'] as Map?)?['coding']);
+  int? get growthOutlook => asIntOrNull(raw['growth_outlook']);
   bool get isStale => asBool(raw['is_stale']);
   List<SkillStanding> get strengths => maps(raw['strengths']).map(SkillStanding.new).toList();
   List<SkillStanding> get gaps => maps(raw['gaps']).map(SkillStanding.new).toList();

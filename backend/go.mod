@@ -3,6 +3,7 @@ module skills-analyzer
 go 1.26.0
 
 require (
+	github.com/dslipak/pdf v0.0.2
 	github.com/gin-contrib/cors v1.7.8
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
