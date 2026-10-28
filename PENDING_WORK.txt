@@ -1,0 +1,79 @@
+SKILLS ANALYZER - PENDING WORK
+================================
+Status: everything on the agreed list is built and committed, except the items below.
+Order of work is a recommendation.
+
+
+1. HOUSEKEEPING (already asked for)
+-----------------------------------
+[ ] Refresh PROJECT_SETUP_AND_LLM_GUIDE.txt. It does not yet describe:
+      - aptitude test, communication review
+      - career fit (interests, personality, coding) and growth outlook
+      - placement prep plan
+      - student insight (Overall reading)
+      - data quality report
+      - faculty risk alerts and score history
+      - built-in knowledge base content
+      - database migrations 15 to 27
+      - the Ollama models needed (llama3.2 and nomic-embed-text)
+[ ] Fix known old bugs:
+      - Match Weights slider shows 0.7%
+      - 7 old TypeScript warnings (for example unused imports in LearningPathPage)
+      - 3 old Flutter analyzer issues (for example unused _config in threshold_screen.dart)
+      - duplicate "Unexpected error:" messages in the older importers
+
+
+2. BUILT BUT NOT FULLY CHECKED
+------------------------------
+[ ] Web: staff "Rate communication" modal was never clicked through.
+[ ] Flutter screens never viewed in a browser:
+      - staff communication rating form
+      - career cards with the Interest / Personality / Coding / Growth chips
+      - placement prep plan
+      - data quality section
+      - readiness cards with risk reasons
+      - readiness history chart
+[ ] Nothing has been tried on a real phone (no Android SDK on this machine).
+[ ] Insight fallback (plain text used when the model's wording is rejected) was only
+    unit-tested; it never happened in live use.
+
+
+3. ADMIN SCREENS THAT DO NOT EXIST YET
+--------------------------------------
+Currently changed only in the database or in code files:
+[ ] Career fit fields: interest code, key traits, coding relevance, growth outlook
+[ ] Project ideas per career
+[ ] Risk rules and readiness weights (fixed in code)
+[ ] Built-in knowledge text (markdown files in backend/internal/modules/kb/knowledge;
+    a change needs a server restart)
+
+
+4. KNOWN LIMITS (not bugs)
+--------------------------
+- Chat: sources are correct, but the small local model still adds general points that
+  are not in the documents.
+- Data quality report finds problems but does not fix them.
+- At-risk alerts are in-app notifications only (no email or SMS).
+- Career growth outlook values are indicative; the placement cell should review them.
+
+
+5. DECISIONS NEEDED
+-------------------
+[ ] Fine-tuning (original item 9): recommended to SKIP. Fine-tuning a 3B model on this
+    little data would make wording worse. Skill, gap and career analysis already work
+    through retrieval and fixed rules. Do it only if the expected-outcome document
+    explicitly requires a trained model.
+[ ] Demo data cleanup: demo rows were added (score history for two students, a few
+    aptitude attempts, communication reviews). Remove before the data is shown as real.
+[ ] Final check against "EduSkillLLM expected outcome.docx": re-read it point by point
+    and list which of the 10 expected outputs are fully covered. Not done since the
+    build; recommended as the last step.
+
+
+RECOMMENDED ORDER
+-----------------
+1. Setup guide and old bug fixes (quick, low risk)
+2. Check the unviewed Flutter screens and the web rating modal
+3. Final check against the expected-outcome document
+4. Admin screens, only for what the college actually wants to edit
+5. Demo data cleanup, then decide on fine-tuning
