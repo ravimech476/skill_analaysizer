@@ -76,7 +76,7 @@ type historyItem struct {
 
 // targetStudent decides whose data the answer may use. Access always goes through student.Service.Get,
 // so the usual role scoping (own data, own children, own department) applies.
-func (h *Handler) targetStudent(ctx context.Context, a actor.Actor, requested *int64) (*student.Student, error) {
+func (h *Handler) targetStudent(ctx context.Context, a actor.Actor, requested *int64, msg string) (*student.Student, error) {
 	var id int64
 	switch {
 	case requested != nil && !a.Has("student"):
@@ -94,9 +94,75 @@ func (h *Handler) targetStudent(ctx context.Context, a actor.Actor, requested *i
 			return nil, err
 		}
 	default:
-		return nil, nil
+		// Staff/admin without explicit student_id: try to find a student mentioned in the message
+		found, err := h.findStudentInMessage(ctx, msg)
+		if err != nil || found == 0 {
+			return nil, err
+		}
+		id = found
 	}
 	return h.students.Get(ctx, a, id)
+}
+
+// findStudentInMessage searches the message for register numbers (like 25CS001) or student names.
+func (h *Handler) findStudentInMessage(ctx context.Context, msg string) (int64, error) {
+	upper := strings.ToUpper(msg)
+	// Try register number first (most specific): look for patterns like 25CS001, 24ECE002
+	var id int64
+	rows, err := h.db.Query(ctx, `
+		SELECT sp.user_id, sp.register_no FROM student_profiles sp
+		JOIN users u ON u.id = sp.user_id AND u.is_active
+		WHERE sp.is_active`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var uid int64
+		var reg string
+		if err := rows.Scan(&uid, &reg); err != nil {
+			return 0, err
+		}
+		if strings.Contains(upper, strings.ToUpper(reg)) {
+			return uid, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	// Try student name (case-insensitive substring match)
+	lower := strings.ToLower(msg)
+	rows2, err := h.db.Query(ctx, `
+		SELECT u.id, lower(u.name) FROM users u
+		JOIN user_roles ur ON ur.user_id = u.id AND ur.is_active
+		JOIN roles r ON r.id = ur.role_id AND r.slug = 'student'
+		JOIN student_profiles sp ON sp.user_id = u.id AND sp.is_active
+		WHERE u.is_active`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows2.Close()
+	for rows2.Next() {
+		var uid int64
+		var name string
+		if err := rows2.Scan(&uid, &name); err != nil {
+			return 0, err
+		}
+		// Match full name or first name (at least 3 chars to avoid false positives)
+		parts := strings.Fields(name)
+		if strings.Contains(lower, name) {
+			return uid, nil
+		}
+		for _, part := range parts {
+			if len(part) >= 3 && strings.Contains(lower, part) {
+				id = uid // keep searching in case a better match comes later
+			}
+		}
+	}
+	if err := rows2.Err(); err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
 func (h *Handler) systemPrompt(data string) string {
@@ -132,7 +198,7 @@ func (h *Handler) ask(c *gin.Context) {
 	ctx := c.Request.Context()
 	a := actor.From(c)
 
-	st, err := h.targetStudent(ctx, a, req.StudentID)
+	st, err := h.targetStudent(ctx, a, req.StudentID, msg)
 	if err != nil {
 		response.Error(c, err)
 		return

@@ -13,6 +13,8 @@ import (
 // intents are cheap keyword checks that decide which database tables are searched for a question.
 type intents struct {
 	placement, interview, learn, career bool
+	attendance, scores, readiness       bool
+	questionbank, profile               bool
 	// category narrows the interview bank to one kind of entry (resume tips, career roadmaps) when asked for.
 	category  string
 	companies []companyRef
@@ -35,10 +37,15 @@ func hasAny(s string, words ...string) bool {
 func (h *Handler) detectIntents(ctx context.Context, msg string) (intents, error) {
 	m := strings.ToLower(msg)
 	in := intents{
-		placement: hasAny(m, "drive", "placement", "placed", "company", "package", "salary", "lpa", "hiring", "hire", "job", "eligible", "eligibility", "apply", "offer"),
-		interview: hasAny(m, "interview", "question", "prepare", "preparation", "practice", "round", "aptitude", "resume", "cv", "roadmap", "tips"),
-		learn:     hasAny(m, "course", "learn", "study", "improve", "gap", "skill", "material", "notes", "resource", "weak", "strong", "mark", "backlog"),
-		career:    hasAny(m, "career", "role", "path", "future", "domain"),
+		placement:    hasAny(m, "drive", "placement", "placed", "company", "package", "salary", "lpa", "hiring", "hire", "job", "eligible", "eligibility", "apply", "offer"),
+		interview:    hasAny(m, "interview", "question", "prepare", "preparation", "practice", "round", "resume", "cv", "roadmap", "tips"),
+		learn:        hasAny(m, "course", "learn", "study", "improve", "gap", "skill", "material", "notes", "resource", "weak", "strong", "mark", "backlog"),
+		career:       hasAny(m, "career", "role", "path", "future", "domain"),
+		attendance:   hasAny(m, "attendance", "absent", "present", "bunking", "leave"),
+		scores:       hasAny(m, "aptitude", "coding score", "communication score", "psychometric", "test score"),
+		readiness:    hasAny(m, "ready", "readiness", "placement ready", "how ready", "risk"),
+		questionbank: hasAny(m, "question paper", "previous year", "past paper", "question bank", "old question"),
+		profile:      hasAny(m, "detail", "profile", "performance", "how am i", "how is", "everything about", "full detail", "about student", "tell me about"),
 	}
 	switch {
 	case hasAny(m, "resume", " cv"):
@@ -137,7 +144,208 @@ func (h *Handler) buildContext(ctx context.Context, st *student.Student, msg str
 			return "", err
 		}
 	}
+	if in.attendance && st != nil {
+		if err := h.writeAttendance(ctx, &b, st.ID); err != nil {
+			return "", err
+		}
+	}
+	if in.scores && st != nil {
+		h.writeScores(ctx, &b, st.ID)
+	}
+	if in.readiness && st != nil {
+		if err := h.writeReadiness(ctx, &b, st); err != nil {
+			return "", err
+		}
+	}
+	if in.questionbank {
+		if err := h.writeQuestionBank(ctx, &b, msg); err != nil {
+			return "", err
+		}
+	}
+	if in.profile && st != nil {
+		if err := h.writeFullProfile(ctx, &b, st); err != nil {
+			return "", err
+		}
+	}
 	return b.String(), nil
+}
+
+// writeAttendance lists attendance per subject for a student.
+func (h *Handler) writeAttendance(ctx context.Context, b *strings.Builder, studentID int64) error {
+	rows, err := h.db.Query(ctx, `
+		SELECT s.name, a.total_classes, a.classes_attended, a.percentage::float8
+		FROM attendance a
+		JOIN subjects s ON s.id = a.subject_id
+		WHERE a.student_id = $1 AND a.is_active
+		ORDER BY a.percentage`, studentID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	var lines []string
+	for rows.Next() {
+		var name string
+		var total, attended int
+		var pct float64
+		if err := rows.Scan(&name, &total, &attended, &pct); err != nil {
+			return err
+		}
+		tag := ""
+		if pct < 75 {
+			tag = " (below 75% — at risk)"
+		}
+		lines = append(lines, fmt.Sprintf("%s: %d/%d classes = %.1f%%%s", name, attended, total, pct, tag))
+	}
+	if len(lines) == 0 {
+		b.WriteString("Attendance: no records yet\n")
+	} else {
+		fmt.Fprintf(b, "ATTENDANCE\n- %s\n", strings.Join(lines, "\n- "))
+	}
+	return rows.Err()
+}
+
+// writeScores adds aptitude, coding, communication, psychometric scores from the student profile.
+func (h *Handler) writeScores(ctx context.Context, b *strings.Builder, studentID int64) {
+	var apt, cod, comm, psych *float64
+	_ = h.db.QueryRow(ctx, `
+		SELECT aptitude_score::float8, coding_score::float8, communication_score::float8, psychometric_score::float8
+		FROM student_profiles WHERE user_id = $1 AND is_active`, studentID).Scan(&apt, &cod, &comm, &psych)
+	type score struct {
+		name string
+		val  *float64
+	}
+	scores := []score{{"Aptitude", apt}, {"Coding", cod}, {"Communication", comm}, {"Psychometric", psych}}
+	var parts []string
+	for _, s := range scores {
+		if s.val != nil && *s.val > 0 {
+			parts = append(parts, fmt.Sprintf("%s: %.1f/100", s.name, *s.val))
+		}
+	}
+	if len(parts) == 0 {
+		b.WriteString("Assessment scores: none recorded yet\n")
+	} else {
+		fmt.Fprintf(b, "ASSESSMENT SCORES: %s\n", strings.Join(parts, ", "))
+	}
+}
+
+// writeReadiness computes and writes the placement readiness score.
+func (h *Handler) writeReadiness(ctx context.Context, b *strings.Builder, st *student.Student) error {
+	var skillCount int
+	_ = h.db.QueryRow(ctx, `SELECT count(*) FROM student_skills WHERE student_id = $1 AND is_active`, st.ID).Scan(&skillCount)
+	var avgAttendance float64
+	_ = h.db.QueryRow(ctx, `SELECT COALESCE(avg(percentage), 0)::float8 FROM attendance WHERE student_id = $1 AND is_active`, st.ID).Scan(&avgAttendance)
+	var apt, cod, comm float64
+	_ = h.db.QueryRow(ctx, `
+		SELECT COALESCE(aptitude_score, 0)::float8, COALESCE(coding_score, 0)::float8, COALESCE(communication_score, 0)::float8
+		FROM student_profiles WHERE user_id = $1 AND is_active`, st.ID).Scan(&apt, &cod, &comm)
+
+	cgpaPart := (st.CGPA / 10.0) * 100 * 0.25
+	skillPart := math.Min(float64(skillCount)/5.0*100, 100) * 0.20
+	aptPart := apt * 0.15
+	codPart := cod * 0.15
+	attPart := avgAttendance * 0.15
+	commPart := comm * 0.10
+	readiness := math.Round(cgpaPart + skillPart + aptPart + codPart + attPart + commPart)
+
+	risk := "Low risk"
+	if readiness < 30 {
+		risk = "HIGH RISK"
+	} else if readiness < 50 {
+		risk = "Medium risk"
+	} else if readiness >= 70 {
+		risk = "Placement ready"
+	}
+
+	fmt.Fprintf(b, "PLACEMENT READINESS: %.0f/100 (%s)\n", readiness, risk)
+	fmt.Fprintf(b, "  Breakdown: CGPA %.0f + Skills %.0f + Aptitude %.0f + Coding %.0f + Attendance %.0f + Communication %.0f\n",
+		cgpaPart, skillPart, aptPart, codPart, attPart, commPart)
+	return nil
+}
+
+// writeQuestionBank fetches relevant previous year questions based on subject keywords in the message.
+func (h *Handler) writeQuestionBank(ctx context.Context, b *strings.Builder, msg string) error {
+	lower := strings.ToLower(msg)
+	rows, err := h.db.Query(ctx, `
+		SELECT s.name, et.name, qb.year, qb.question, qb.marks, qb.blooms_level
+		FROM question_bank qb
+		JOIN subjects s ON s.id = qb.subject_id
+		LEFT JOIN exam_types et ON et.id = qb.exam_type_id
+		WHERE qb.is_active AND lower(s.name) LIKE '%' || $1 || '%'
+		ORDER BY qb.year DESC, qb.marks DESC LIMIT 6`, lower)
+	if err != nil {
+		// If no subject match, try without filter
+		rows, err = h.db.Query(ctx, `
+			SELECT s.name, et.name, qb.year, qb.question, qb.marks, qb.blooms_level
+			FROM question_bank qb
+			JOIN subjects s ON s.id = qb.subject_id
+			LEFT JOIN exam_types et ON et.id = qb.exam_type_id
+			WHERE qb.is_active
+			ORDER BY qb.year DESC LIMIT 6`)
+		if err != nil {
+			return err
+		}
+	}
+	defer rows.Close()
+	var lines []string
+	for rows.Next() {
+		var subject, question, blooms string
+		var exam *string
+		var year, marks int
+		if err := rows.Scan(&subject, &exam, &year, &question, &marks, &blooms); err != nil {
+			return err
+		}
+		examName := "General"
+		if exam != nil {
+			examName = *exam
+		}
+		lines = append(lines, fmt.Sprintf("[%s, %s, %d, %d marks, %s] %s", subject, examName, year, marks, blooms, clip(question, 200)))
+	}
+	if len(lines) > 0 {
+		fmt.Fprintf(b, "QUESTION BANK (previous year questions)\n- %s\n", strings.Join(lines, "\n- "))
+	}
+	return rows.Err()
+}
+
+// writeFullProfile adds extra details when a general "tell me about" or "details" question is asked.
+func (h *Handler) writeFullProfile(ctx context.Context, b *strings.Builder, st *student.Student) error {
+	// Attendance summary
+	var avgAtt float64
+	_ = h.db.QueryRow(ctx, `SELECT COALESCE(avg(percentage), 0)::float8 FROM attendance WHERE student_id = $1 AND is_active`, st.ID).Scan(&avgAtt)
+	if avgAtt > 0 {
+		fmt.Fprintf(b, "Average attendance: %.1f%%\n", avgAtt)
+	}
+	// Assessment scores
+	h.writeScores(ctx, b, st.ID)
+	// Placement status
+	var placedCount int
+	_ = h.db.QueryRow(ctx, `SELECT count(*) FROM placement_records WHERE student_id = $1 AND is_active`, st.ID).Scan(&placedCount)
+	if placedCount > 0 {
+		rows, err := h.db.Query(ctx, `
+			SELECT co.name::text, j.title, pr.package_lpa::float8
+			FROM placement_records pr
+			JOIN companies co ON co.id = pr.company_id
+			JOIN company_job_roles j ON j.id = pr.job_role_id
+			WHERE pr.student_id = $1 AND pr.is_active`, st.ID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var company, title string
+				var pkg float64
+				if rows.Scan(&company, &title, &pkg) == nil {
+					fmt.Fprintf(b, "Placed at: %s - %s (%.2f LPA)\n", company, title, pkg)
+				}
+			}
+		}
+	} else {
+		b.WriteString("Placement status: not yet placed\n")
+	}
+	// Application count
+	var appCount int
+	_ = h.db.QueryRow(ctx, `SELECT count(*) FROM placement_applications WHERE student_id = $1 AND is_active`, st.ID).Scan(&appCount)
+	if appCount > 0 {
+		fmt.Fprintf(b, "Active applications: %d\n", appCount)
+	}
+	return nil
 }
 
 // writeMarks lists the latest final-exam result per subject and returns the ids of weak subjects (<60%).
