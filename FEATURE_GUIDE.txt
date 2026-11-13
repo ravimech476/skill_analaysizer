@@ -1,0 +1,622 @@
+================================================================================
+  SKILLS ANALYZER — COMPLETE FEATURE GUIDE
+  How every menu item works
+================================================================================
+
+
+================================================================================
+OVERVIEW
+================================================================================
+
+1. DASHBOARD
+   ─────────
+   WHO: All users (different views per role)
+
+   Admin/Staff view:
+   - Headline stats: total students, staff, parents, admins
+   - Module tiles: quick links to every feature with descriptions
+
+   Student view:
+   - Personal stats: CGPA, backlogs, skills count, eligible drives
+   - Shortcuts: My Analysis, Placement Drives, My Marks, My Profile
+
+   Parent view:
+   - Child picker (if multiple children)
+   - Child's stats and shortcuts
+
+2. REPORTS
+   ───────
+   WHO: Admin, Staff (department-scoped)
+
+   Shows analytics dashboard:
+   - Headline numbers: students, staff, classes, avg CGPA, placed %, open drives
+   - Pass % by class (horizontal bar chart, filterable by exam type)
+   - CGPA distribution (column chart by department)
+   - Skill gaps vs current drives (coverage %)
+   - Placement by batch (table with placed %, highest/median package)
+   - Offers per month (column chart, last 12 months)
+   - Department filter for college-wide users
+   - Excel export for student lists and placement reports
+
+3. AI CHAT ASSISTANT (floating widget)
+   ────────────────────────────────────
+   WHO: All users with chat.use permission
+
+   A floating chat bubble on every page (bottom-right corner).
+   Click to open the chat panel:
+   - Type any question about academics, skills, placement, careers
+   - The system uses RAG (Retrieval Augmented Generation):
+     1. Searches YOUR database for relevant data
+     2. Searches the Knowledge Base for relevant passages
+     3. Sends context + question to Ollama LLM
+     4. Returns a personalized answer with source citations
+
+   Example questions:
+   - "What skills do I need for TCS?"
+   - "How can I improve my CGPA?"
+   - "Which companies are hiring this month?"
+   - "Explain Data Structures concepts"
+   - "Am I eligible for Zoho placement?"
+
+   Features:
+   - Suggestion chips for common questions
+   - Markdown formatted responses
+   - Source citations (which documents the answer came from)
+   - Conversation history (persisted across sessions)
+   - Clear history option
+
+
+================================================================================
+ACADEMICS
+================================================================================
+
+4. DEPARTMENTS
+   ───────────
+   WHO: Admin, Staff
+
+   CRUD for academic departments:
+   - Fields: Code (e.g., CSE), Name, Head of Department (select from staff)
+   - Shows: class count, student count per department
+   - Import tab: bulk upload departments from Excel
+
+   HOW: Admin creates departments. Each staff member and student belongs to
+   one department. HODs see only their department's data.
+
+5. ACADEMIC YEARS
+   ──────────────
+   WHO: Admin, Staff
+
+   CRUD for academic year periods:
+   - Fields: Name (e.g., 2026-27), Start date, End date, Is Current
+   - Only one year can be "current" at a time (auto-unmarks others)
+   - Import tab: bulk upload from Excel
+
+   HOW: The current academic year is used for new classes and student enrollment.
+
+6. CLASSES
+   ───────
+   WHO: Admin, Staff
+
+   Manage classes (sections):
+   - A class = Department + Academic Year + Year Level + Section
+   - Example: CSE II-A = Computer Science, 2nd Year, Section A
+   - Fields: Department, Academic Year, Year Level (I-IV), Section, Semester, Class Incharge
+   - Class incharge is a staff member who oversees the class
+
+   HOW: Students are assigned to a class. Staff see students in their
+   department's classes. Marks are entered per class + subject.
+
+7. SUBJECTS
+   ────────
+   WHO: Admin, Staff
+
+   CRUD for academic subjects:
+   - Fields: Code (e.g., CS3401), Name (e.g., Data Structures), Credits, Type
+   - Types: Theory, Lab, Elective, Project
+   - Import tab: bulk upload from Excel
+
+   HOW: Subjects are allocated to staff for mark entry. Each subject can be
+   mapped to skills for automatic skill scoring.
+
+8. EXAMS
+   ─────
+   WHO: Admin, Staff
+
+   CRUD for exam types:
+   - Fields: Code (e.g., IA1, SEM), Name, Max Marks, Pass Percentage, Is Final, Sort Order
+   - "Is Final" marks the end-semester exam (used for SGPA/CGPA calculation)
+   - Import tab: bulk upload from Excel
+
+   HOW: When entering marks, staff select the exam type. The system auto-calculates
+   grades and results based on the configured max marks and pass percentage.
+
+9. MARKS
+   ─────
+   WHO: Admin, Staff (entry), Students (view own), Parents (view children)
+
+   Admin/Staff tabs:
+   - Enter Marks: Select class + subject + exam type → grid of students → enter marks
+     - Auto-calculates grade, grade point, pass/fail
+     - Stats bar: entered, absent, pass %, failed, average, highest
+     - Excel template download + upload for bulk entry
+   - Class Results: Select class + semester + exam → cross-subject result matrix
+     - Per-subject stats (average, highest, failed, pass %)
+     - Export to Excel
+   - Subject Allocation: Assign which staff teaches which subject to which class
+
+   Student view:
+   - My Marks: all semesters, SGPA per semester, subject-by-subject marks
+   - PDF mark statement download
+
+   Parent view:
+   - Child picker + same mark view
+
+10. ATTENDANCE
+    ──────────
+    WHO: Admin, Staff
+
+    CRUD for attendance records:
+    - Fields: Student, Class, Subject, Semester, Academic Year, Total Classes, Classes Attended
+    - Percentage auto-computed from total/attended
+    - Color-coded: green >=75%, amber >=60%, red <60%
+
+    HOW: Staff records attendance per student per subject. The attendance percentage
+    feeds into the Placement Readiness score (15% weight by default).
+
+11. CO/PO MAPPING
+    ─────────────
+    WHO: Admin, Staff
+
+    Three tabs:
+    - Program Outcomes (PO): Department-level outcomes (PO1, PO2...)
+      Fields: Department, Code, Description
+    - Course Outcomes (CO): Subject-level outcomes (CO1, CO2...)
+      Fields: Subject, Code, Description
+    - CO-PO Mapping: Which CO maps to which PO with strength (1-3)
+      Fields: Course Outcome, Program Outcome, Strength (Low/Medium/High)
+
+    HOW: This is the curriculum alignment framework. COs define what a subject
+    teaches; POs define what the department aims to produce. The mapping shows
+    how each subject contributes to program-level goals.
+
+
+================================================================================
+PEOPLE
+================================================================================
+
+12. STUDENTS
+    ────────
+    WHO: Admin, Staff (CRUD), Students (own profile), Parents (children)
+
+    Admin/Staff tabs:
+    - Student List: Search, filter by department/class/batch/lifecycle/status
+      - "+ New student" button opens create form
+      - Click a student → detail page with tabs
+      - Excel export
+    - Import tab:
+      - Import Students: bulk upload from Excel (register_no, name, department, class...)
+      - Import Student Skills: bulk upload skill levels (register_no, skill, proficiency)
+
+    Student creation/edit form includes:
+    - Personal: Name, Register No, Department, Class, Batch, Admission Year
+    - Contact: Mobile, Email, Gender, DOB, Blood Group, Address
+    - Parent: Name, Mobile, Relation (can add multiple)
+    - Skills: Type/pick skill + proficiency (1-5 stars)
+      - If a new skill name is typed, it's auto-created in the Skill Master
+
+    Student detail page tabs:
+    - Profile: photo upload, personal details, resume upload, parents
+    - Marks: semester-wise marks with SGPA
+    - Skills: manually added skills with proficiency
+    - Placement: eligible drives, applications
+    - Documents: upload/view student documents
+
+    Student view: own profile only
+    Parent view: linked children's profiles
+
+13. STAFF
+    ─────
+    WHO: Admin, Staff
+
+    CRUD for staff members:
+    - Fields: Name, Employee Code, Department, Designation, Qualification,
+      Roles (staff/hod/placement_officer), Mobile, Email, Gender, DOB, Joined Date
+    - Import tab: bulk upload from Excel
+
+    HOW: Staff are assigned to departments. HODs get department-wide access.
+    Placement officers get cross-department access for placement features.
+    The employee code becomes the login username.
+
+
+================================================================================
+SKILL ANALYZER
+================================================================================
+
+14. STUDENT ANALYSIS
+    ────────────────
+    WHO: Admin (any student), Staff (own dept), Student (own), Parent (children)
+
+    Individual student skill analysis from mark history:
+    - Search student by name/register number
+    - Shows:
+      a. Student info card (CGPA, backlogs, department, class)
+      b. SGPA Trend chart (column chart across semesters)
+      c. Semester performance table (SGPA, subjects, pass/fail, avg %)
+      d. Subject marks bar chart (color-coded: green >=75%, amber >=60%, red <60%)
+      e. Subject-wise marks table (marks, %, result, grade)
+      f. Skills with star ratings
+      g. Skill distribution donut chart
+      h. Performance overview donut (strong/average/weak subjects)
+      i. Strengths (green tags) and Weaknesses (red tags)
+      j. Eligible placement drives with match %
+
+    Students see their own analysis automatically (no search needed).
+
+15. CLASS ANALYSIS
+    ──────────────
+    WHO: Admin (any class), Staff (own dept)
+
+    Class-wide performance overview:
+    - Select a class from dropdown
+    - Shows:
+      a. Stats: students, avg CGPA, pass %, top CGPA
+      b. Pass rate donut chart
+      c. Subject performance table (avg %, pass %, failed, highest)
+      d. Subject avg % bar chart
+      e. Skill coverage progress bars (how many students have each skill)
+      f. Student ranking table (by CGPA, with skill count and placed status)
+
+16. DEPARTMENT ANALYSIS
+    ───────────────────
+    WHO: Admin (all depts), Staff (own dept)
+
+    Department-wide analytics:
+    - Shows all departments with comparison
+    - Stats: total students, avg CGPA, avg pass %, total placed
+    - Department comparison table (students, CGPA, pass %, placed, top skills)
+    - CGPA comparison bar chart across departments
+    - Placement rate donut + pass/fail donut
+    - Skill distribution table (students per skill per department)
+    - Semester trend table + chart (avg marks % per semester)
+    - Weak subjects (pass rate below 70%)
+
+17. PLACEMENT READINESS
+    ───────────────────
+    WHO: Admin, Staff
+
+    Combined readiness score per student:
+    - Formula: CGPA (25%) + Skills (20%) + Aptitude (15%) + Coding (15%)
+               + Attendance (15%) + Communication (10%)
+    - Weights are configurable in Skill Analysis Config
+    - Filter by department and class
+    - Shows:
+      a. Stats: avg readiness, % above 70, needing attention, top student
+      b. Readiness distribution donut (Ready >=70 / Moderate 50-69 / Low <50)
+      c. Student rankings table (expandable with details per component)
+    - Risk levels: High (<30%), Medium (<50%), Ready (>=70%)
+
+18. CAREER PREDICTION
+    ─────────────────
+    WHO: Admin/Staff (catalogue + matches), Students (own matches), Parents (children)
+
+    Rule-based career matching (no AI needed):
+    - Admin/Staff tabs:
+      a. Student matches: Search student → see ranked careers
+         - Readiness levels: Ready (all core skills met) / Close (50%+) / Explore
+         - Each career shows: match score, skill gaps, recommended courses
+      b. Career catalogue: CRUD for careers
+         - Fields: Code, Name, Domain, Avg Package, Min CGPA, Description
+         - Career fit: Interest Code (RIASEC), Key Traits, Coding Relevance, Growth Outlook
+         - Required skills with levels/weights/core flags
+      c. Courses: CRUD for learning resources per skill
+         - Fields: Skill, Title, Provider, URL, Level, Duration, Free/Paid, Certification
+      d. Project Ideas: CRUD for project ideas per career
+         - Fields: Career, Title, Description, Level (Beginner/Intermediate/Advanced)
+
+    Student view:
+    - "Matched to me": ranked careers with readiness badges
+    - Can rate/give feedback on career suggestions
+
+    HOW: The system compares student's skills against each career's required skills.
+    Careers are classified as Ready (every core skill met + CGPA), Close (50%+ match),
+    or Explore. Each gap includes up to 3 recommended courses.
+
+19. LEARNING PATH
+    ─────────────
+    WHO: Admin/Staff (catalogue + recommendations), Students (own), Parents (children)
+
+    Personalized course recommendations:
+    - Admin/Staff: Pick a student → see recommended courses based on skill gaps
+    - Student: "My recommendations" → courses based on career match gaps
+    - Course catalogue: All courses with skill, provider, level, hours
+
+    HOW: When career matching finds a skill gap, the system looks up courses
+    for that skill and recommends them. Students see courses sorted by
+    priority (biggest gaps first).
+
+
+================================================================================
+PLACEMENT
+================================================================================
+
+20. COMPANIES
+    ─────────
+    WHO: Admin, Staff
+
+    Company directory for placement:
+    - Fields: Name, Industry, Location, Website, Contact Person, Email, Phone, Description
+    - Logo upload
+    - Shows: job role count, placed count, highest package
+    - Import tab: bulk upload from Excel
+
+    HOW: Companies are referenced when creating placement drives.
+
+21. PLACEMENT DRIVES
+    ────────────────
+    WHO: Admin/Staff (manage), Students (view eligible), Parents (view status)
+
+    Admin/Staff view:
+    - Drives list with Edit/Delete buttons per row
+    - "+ New job role" opens a centered popup form:
+      - Company (select), Title, Package (LPA), Openings
+      - Drive Date, Last Apply Date, Status (upcoming/open/closed/completed)
+      - Eligibility: Min CGPA, Max Backlogs, Eligible Batch, Departments
+      - Required Skills: Skill + Level (1-5) + Weight + Mandatory/Nice toggle
+      - Description, JD file upload
+    - Click a drive row → detail popup showing:
+      a. Drive info (package, dates, skills, eligibility)
+      b. Eligible Students grouped by Department → Class
+         - Checkboxes for selection
+         - "Select all CSE" / "Select all" per class buttons
+         - Shows: student name, CGPA, matched skills (green), missing skills (red)
+         - "Shortlist & Notify" button → creates applications + sends notification
+      c. Applications table with pipeline management:
+         shortlisted → applied → in_process → selected/rejected/withdrawn
+    - Import tab: bulk upload drives from Excel (skills format: Programming:3,SQL:2)
+
+    Auto-notification: When a drive status is set to "open", ALL eligible students
+    automatically receive a notification: "New drive: TCS - Software Developer.
+    You are eligible."
+
+    Student view:
+    - List of drives they're eligible for
+    - Skill match percentage per drive
+    - Gap bars showing what they need
+    - Application status tracking
+
+    Parent view: children's placement status
+
+22. PLACEMENT HISTORY
+    ────────────────
+    WHO: Admin/Staff (all records), Students (own), Parents (children)
+
+    Confirmed placements:
+    - Admin/Staff:
+      - Stats: placed %, offers count, highest/average package
+      - Department breakdown with progress bars
+      - Company breakdown
+      - Full placement records table (student, company, role, package, offer date)
+      - Offer letter upload per placement
+      - Excel export
+    - Student: own placement offers
+    - Parent: children's placements
+
+    HOW: When a student's application status is changed to "selected", a
+    placement record is automatically created. The "higher package" rule
+    prevents placing at equal/lower packages.
+
+
+================================================================================
+RESOURCES
+================================================================================
+
+23. INTERVIEW BANK
+    ──────────────
+    WHO: Admin/Staff (manage), Students (browse), Parents (browse)
+
+    Company-wise interview questions:
+    - Tabs: Documents (file uploads), Questions (CRUD), Import
+    - Question fields: Company, Category, Question, Answer, Difficulty, Tags
+    - Categories: Technical, Aptitude, HR, Coding, Group Discussion, Case Study
+    - Difficulty: Easy, Medium, Hard (color-coded)
+    - Search by question text or tags
+    - Upload documents: PDF, Word files with interview questions
+
+    HOW: Staff adds interview questions from past placement drives.
+    Students browse to prepare for specific companies.
+
+24. STUDY MATERIALS
+    ───────────────
+    WHO: Admin/Staff (upload), Students (browse), Parents (browse)
+
+    Faculty notes and resources per subject:
+    - Fields: Subject, Title, Type, Description, URL/File
+    - Types: Notes, Question Paper, Slides, Reference, Video, Link
+    - Search by title or description
+    - Clickable URL links
+
+    HOW: Staff uploads notes, previous papers, slides per subject.
+    Students access them for study preparation.
+
+25. QUESTION BANK
+    ─────────────
+    WHO: Admin/Staff (manage), Students (browse), Parents (browse)
+
+    Previous year questions with Bloom's taxonomy:
+    - Tabs: Question Papers (files), Questions (CRUD), Import
+    - Question fields: Subject, Exam Type, Year, Question Text, Marks, Bloom's Level, Unit
+    - Bloom's Taxonomy levels: Remember, Understand, Apply, Analyze, Evaluate, Create
+    - Upload question paper documents
+
+    HOW: Staff enters/uploads previous year questions. The system can classify
+    questions by Bloom's taxonomy level (using AI if available). Students use
+    this for exam preparation.
+
+26. KNOWLEDGE BASE
+    ──────────────
+    WHO: Admin, Staff
+
+    AI knowledge repository for the chat assistant:
+    - Upload documents (PDF, Word, Text, Markdown, up to 10MB)
+    - Documents are automatically:
+      1. Split into passages (chunks)
+      2. Embedded using Ollama (nomic-embed-text model)
+      3. Stored as vectors for semantic search
+    - Test search: type a question to see which passages would be found
+    - Built-in content: career paths, industry skills, domain knowledge
+      (embedded at build time, supplemented by uploads)
+
+    HOW: When a student asks the AI Chat a question, the system searches this
+    knowledge base for relevant passages and includes them in the prompt.
+    More documents = better answers.
+
+
+================================================================================
+SETTINGS
+================================================================================
+
+27. USERS
+    ─────
+    WHO: Admin
+
+    User account management:
+    - CRUD for all user accounts (students, staff, parents, admins)
+    - Fields: Name, Username, Mobile, Gender, Email, DOB, Password
+    - Actions: Edit, Change Roles, Set Password, Activate/Deactivate
+    - Search and filter by role, status
+
+    HOW: Every person in the system has a user account. Students use register
+    number as username, staff use employee code, parents use mobile number.
+
+28. ROLES & PERMISSIONS
+    ───────────────────
+    WHO: Admin
+
+    Role management:
+    - 6 system roles: Admin, Staff, HOD, Placement Officer, Student, Parent
+    - Each role has a set of permissions (module.action format)
+    - Permission editor: grouped by module, checkbox per permission
+    - "Select all" per module group
+
+    HOW: Permissions control what each role can see and do. Admin bypasses
+    all permission checks. A user can have multiple roles (e.g., Staff + HOD).
+
+29. SKILLS (Skill Master)
+    ─────────────────────
+    WHO: Admin, Staff
+
+    Skill catalogue CRUD:
+    - Fields: Name, Category
+    - Categories: Programming, Framework, Database, Tool, Technical, Soft Skill, Domain
+    - Shows: student count, job role count per skill
+    - Import tab: bulk upload skill names from Excel
+
+    HOW: Skills are the core of the system. Students have skills (added via
+    student form). Placement drives require skills. Career matching uses skills.
+    The Skill Master is the central catalogue.
+
+30. SKILL ANALYSIS CONFIG
+    ─────────────────────
+    WHO: Admin
+
+    Three configuration sections:
+
+    a. Readiness Score Weights:
+       - CGPA weight (default 25%)
+       - Skills weight (default 20%)
+       - Aptitude weight (default 15%)
+       - Coding weight (default 15%)
+       - Attendance weight (default 15%)
+       - Communication weight (default 10%)
+       - Must sum to 100%
+       - Risk thresholds: High risk below X%, Medium risk below Y%
+
+    b. Global Mark Threshold:
+       - Minimum mark % to consider a student skilled (default 75%)
+       - Per-skill overrides (e.g., Database requires 80%)
+
+    c. Match Weights:
+       - Skill Score weight vs Academic Score weight for placement matching
+       - Default: 70% skill, 30% academic
+
+    - "Recompute All" button to rebuild all student scores after config change
+
+31. NOTIFICATIONS
+    ─────────────
+    WHO: All users (inbox), Staff with notification.create (send)
+
+    In-app notification system:
+    - Inbox: all notifications with unread badge, type filters
+    - Mark read / mark all read / delete
+    - Notification types: General, Placement, Marks, Skills, System
+
+    Staff can send targeted notifications:
+    - Target: All users, By role, By department, By class, Individual student
+    - Include parents option
+    - Title, body, category, file attachment
+    - "Sent" tab: outbox showing delivery stats
+
+    Auto-notifications sent by the system:
+    - Drive opens → all eligible students notified
+    - Student shortlisted → student + parents notified
+    - Application status changes → student notified
+    - Selected for placement → student + parents notified ("Congratulations!")
+    - Marks published → students notified
+    - Skills recorded → student notified
+    - Certificate verified → student notified
+
+
+================================================================================
+NOTIFICATION FLOW — WHEN NOTIFICATIONS ARE SENT
+================================================================================
+
+Placement:
+  Drive status → "open"     → "New drive: [Company] - [Title]. You are eligible."
+  Student shortlisted        → "Shortlisted for [Company] - [Title]"
+  Status → "in_process"     → "[Company]: moved to the next round"
+  Status → "selected"       → "Congratulations! Selected for [Company] at [Package] LPA"
+  Status → "rejected"       → "Placement update: [Company]"
+
+All placement notifications include parents automatically.
+
+Manual:
+  Staff/Admin can send custom notifications to any audience.
+
+
+================================================================================
+DATA FLOW — HOW EVERYTHING CONNECTS
+================================================================================
+
+Student Creation:
+  Admin creates student → assigns department + class + skills
+  → Student can login with register number
+
+Marks Entry:
+  Staff enters marks per class/subject/exam → grades auto-calculated
+  → CGPA/SGPA recomputed → feeds into Student Analysis
+
+Skill Analysis:
+  Student skills (from form) + marks → Student Analysis dashboard
+  → Strengths/weaknesses identified → feeds into Career Prediction
+
+Placement:
+  Admin creates drive with required skills + eligibility
+  → System checks each student: CGPA + skills + backlogs + department + batch
+  → Eligible students listed with checkboxes
+  → Staff shortlists → notifications sent → pipeline managed
+  → Selected = placement record created
+
+Career Matching:
+  Student skills compared against career requirements
+  → Readiness: Ready / Close / Explore
+  → Skill gaps identified → courses recommended
+
+AI Chat:
+  Student asks question → backend searches DB + Knowledge Base
+  → Context + question sent to Ollama LLM
+  → Personalized answer returned with citations
+
+
+================================================================================
+  END OF FEATURE GUIDE
+================================================================================

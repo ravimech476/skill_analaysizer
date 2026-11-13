@@ -86,6 +86,14 @@ const gatherSQL = `
 	  AND ($2::bigint IS NULL OR u.department_id = $2)`
 
 func (h *Handler) gather(ctx context.Context, classID, deptID *int64) ([]*Row, error) {
+	w, err := LoadReadinessWeights(ctx, h.db)
+	if err != nil {
+		return nil, err
+	}
+	rt, err := LoadRiskThresholds(ctx, h.db)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := h.db.Query(ctx, gatherSQL, classID, deptID)
 	if err != nil {
 		return nil, err
@@ -102,7 +110,7 @@ func (h *Handler) gather(ctx context.Context, classID, deptID *int64) ([]*Row, e
 		m := Metrics{CGPA: r.CGPA, Backlogs: r.Backlogs, SkillCount: r.SkillCount, Aptitude: r.Aptitude,
 			Coding: r.Coding, Communication: r.Communication, Attendance: r.Attendance}
 		r.SkillsScore = round1(SkillsScore(r.SkillCount))
-		r.Readiness = Readiness(m)
+		r.Readiness = Readiness(m, w)
 		r.Score = r.Readiness
 		if before != nil {
 			d := round1(r.Readiness - *before)
@@ -110,7 +118,7 @@ func (h *Handler) gather(ctx context.Context, classID, deptID *int64) ([]*Row, e
 		}
 		r.Risk, r.Reasons = RiskNone, []Reason{}
 		if !r.IsPlaced { // a placed student needs no placement alerts
-			r.Risk, r.Reasons = Assess(m, r.Readiness, r.Change)
+			r.Risk, r.Reasons = Assess(m, r.Readiness, r.Change, rt)
 		}
 		out = append(out, r)
 	}

@@ -39,7 +39,6 @@ class ThresholdScreen extends StatefulWidget {
 }
 
 class _ThresholdScreenState extends State<ThresholdScreen> {
-  Map<String, dynamic>? _config;
   List<MasterRow>? _skills;
   bool _loading = true;
 
@@ -59,9 +58,9 @@ class _ThresholdScreenState extends State<ThresholdScreen> {
       final skillRows = await mastersApi.all('skills');
       final threshold = config['global_threshold'] as num? ?? 75;
       final overrides = (config['skill_overrides'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, (v as num).toDouble())) ?? {};
-      final sw = (config['match_weights']?['skill'] as num?)?.toDouble() ?? 70;
+      final rawSw = (config['match_weights']?['skill'] as num?)?.toDouble() ?? 0.70;
+      final sw = rawSw <= 1 ? rawSw * 100 : rawSw;
       setState(() {
-        _config = config;
         _skills = skillRows;
         _globalThreshold = threshold.toDouble();
         _overrides = overrides;
@@ -79,7 +78,7 @@ class _ThresholdScreenState extends State<ThresholdScreen> {
       await scoresApi.saveScoring({
         'global_threshold': _globalThreshold.round(),
         'skill_overrides': _overrides,
-        'match_weights': {'skill': _skillWeight.round(), 'academic': (100 - _skillWeight).round()},
+        'match_weights': {'skill': _skillWeight / 100, 'academic': (100 - _skillWeight) / 100},
       });
       toast(context, 'Configuration saved');
     });

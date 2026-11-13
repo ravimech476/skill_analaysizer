@@ -201,6 +201,23 @@ var Resources = []*Resource{
 		Extra:   []string{"(SELECT name::text FROM skills WHERE id = t.skill_id) AS skill_name"},
 	},
 	{
+		Name:  "Project idea",
+		Path:  "/project-ideas",
+		Table: "career_project_ideas",
+		Perm:  "career",
+		Fields: []Field{
+			{Name: "career_id", Kind: FK, Ref: "careers", Required: true},
+			{Name: "title", Kind: String, Required: true, Max: 200},
+			{Name: "description", Kind: String, Max: 2000},
+			{Name: "level", Kind: Int, Default: float64(2), Min: F(1), Cap: F(3)},
+		},
+		Search:  []string{"title", "description"},
+		OrderBy: "t.career_id, t.level, t.title",
+		Extra: []string{
+			"(SELECT name::text FROM careers WHERE id = t.career_id) AS career_name",
+		},
+	},
+	{
 		Name:  "Interview question",
 		Path:  "/interview-questions",
 		Table: "interview_questions",

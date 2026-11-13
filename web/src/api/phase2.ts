@@ -252,7 +252,7 @@ export interface Page {
 
 // ---- generic masters ----
 
-export type MasterPath = 'departments' | 'academic-years' | 'subjects' | 'exam-types' | 'grade-scales' | 'skills' | 'companies' | 'courses' | 'interview-questions' | 'study-materials' | 'attendance' | 'program-outcomes' | 'course-outcomes' | 'co-po-mappings' | 'question-bank' | 'interview-documents' | 'question-papers';
+export type MasterPath = 'departments' | 'academic-years' | 'subjects' | 'exam-types' | 'grade-scales' | 'skills' | 'companies' | 'courses' | 'project-ideas' | 'interview-questions' | 'study-materials' | 'attendance' | 'program-outcomes' | 'course-outcomes' | 'co-po-mappings' | 'question-bank' | 'interview-documents' | 'question-papers';
 
 export const mastersApi = {
   list: <T,>(path: MasterPath | 'year-levels' | 'semesters', params: Record<string, unknown> = { all: true }) =>

@@ -270,7 +270,7 @@ function CareerForm({ career, onClose }: { career: Career | 'new' | null; onClos
   const qc = useQueryClient();
   const { data: skills } = useSkills();
   const existing = career && career !== 'new' ? career : null;
-  const [form, setForm] = useState<CareerInput>(() =>
+  const [form, setForm] = useState<Omit<CareerInput, 'key_traits'> & { key_traits: string }>(() =>
     existing
       ? {
           code: existing.code,
@@ -279,14 +279,22 @@ function CareerForm({ career, onClose }: { career: Career | 'new' | null; onClos
           description: existing.description,
           avg_package: existing.avg_package,
           min_cgpa: existing.min_cgpa,
+          holland_code: existing.holland_code ?? '',
+          key_traits: (existing.key_traits ?? []).join(', '),
+          coding_relevance: existing.coding_relevance ?? 0,
+          growth_outlook: existing.growth_outlook ?? null,
+          growth_note: existing.growth_note ?? '',
           skills: existing.skills.map((s) => ({ skill_id: s.skill_id, required_level: s.required_level, weight: s.weight, is_core: s.is_core })),
         }
-      : { code: '', name: '', domain: '', description: '', avg_package: null, min_cgpa: 0, skills: [] },
+      : { code: '', name: '', domain: '', description: '', avg_package: null, min_cgpa: 0, holland_code: '', key_traits: '', coding_relevance: 0, growth_outlook: null, growth_note: '', skills: [] },
   );
   const [error, setError] = useState<string>();
 
   const save = useMutation({
-    mutationFn: () => (existing ? careersApi.update(existing.id, form) : careersApi.create(form)),
+    mutationFn: () => {
+      const payload: CareerInput = { ...form, key_traits: form.key_traits.split(',').map((s) => s.trim()).filter(Boolean) };
+      return existing ? careersApi.update(existing.id, payload) : careersApi.create(payload);
+    },
     onSuccess: () => {
       message.success(existing ? 'Career updated' : 'Career added');
       qc.invalidateQueries({ queryKey: ['careers'] });
@@ -334,6 +342,30 @@ function CareerForm({ career, onClose }: { career: Career | 'new' | null; onClos
         <Col span={24}>
           <Typography.Text type="secondary">What the job involves</Typography.Text>
           <Input.TextArea rows={2} value={form.description ?? ''} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        </Col>
+        <Col xs={24} sm={8}>
+          <Typography.Text type="secondary">Interest Code (RIASEC)</Typography.Text>
+          <Input maxLength={3} placeholder="RIA" value={form.holland_code ?? ''} onChange={(e) => setForm({ ...form, holland_code: e.target.value.toUpperCase() })} />
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>Holland RIASEC code: R=Realistic, I=Investigative, A=Artistic, S=Social, E=Enterprising, C=Conventional</Typography.Text>
+        </Col>
+        <Col xs={24} sm={16}>
+          <Typography.Text type="secondary">Key Traits</Typography.Text>
+          <Input placeholder="analytical, creative, detail-oriented" value={form.key_traits} onChange={(e) => setForm({ ...form, key_traits: e.target.value })} />
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>Comma separated personality traits</Typography.Text>
+        </Col>
+        <Col xs={12} sm={8}>
+          <Typography.Text type="secondary">Coding Relevance</Typography.Text>
+          <InputNumber min={0} max={1} step={0.1} style={{ width: '100%' }} value={form.coding_relevance} onChange={(v) => setForm({ ...form, coding_relevance: v ?? 0 })} />
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>0 = no coding, 1 = highly coding intensive</Typography.Text>
+        </Col>
+        <Col xs={12} sm={8}>
+          <Typography.Text type="secondary">Growth Outlook</Typography.Text>
+          <Select allowClear placeholder="Select" style={{ width: '100%' }} value={form.growth_outlook} onChange={(v) => setForm({ ...form, growth_outlook: v ?? null })} options={[1, 2, 3, 4, 5].map((n) => ({ value: n, label: `${n} — ${['', 'Low', 'Below avg', 'Moderate', 'High', 'Very high'][n]}` }))} />
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>1=Low to 5=Very High</Typography.Text>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Typography.Text type="secondary">Growth Note</Typography.Text>
+          <Input.TextArea rows={1} placeholder="Brief note on career growth prospects" value={form.growth_note ?? ''} onChange={(e) => setForm({ ...form, growth_note: e.target.value })} />
         </Col>
       </Row>
 
@@ -553,6 +585,31 @@ function CoursesMaster() {
   );
 }
 
+const PROJECT_LEVELS: Record<number, string> = { 1: 'Beginner', 2: 'Intermediate', 3: 'Advanced' };
+
+function ProjectIdeasMaster() {
+  const { data: careers } = useQuery({ queryKey: ['careers', '', undefined], queryFn: () => careersApi.list() });
+  return (
+    <MasterCrud<{ id: number; career_id: number; career_name: string; title: string; description: string | null; level: number; is_active: boolean }>
+      path="project-ideas"
+      perm="career"
+      noun="project idea"
+      fields={[
+        { name: 'career_id', label: 'Career', type: 'select', required: true, options: (careers ?? []).map((c) => ({ value: c.id, label: c.name })) },
+        { name: 'title', label: 'Title', type: 'text', required: true },
+        { name: 'description', label: 'Description', type: 'text' },
+        { name: 'level', label: 'Level', type: 'select', options: [{ value: 1, label: 'Beginner' }, { value: 2, label: 'Intermediate' }, { value: 3, label: 'Advanced' }] },
+      ]}
+      columns={[
+        { title: 'Title', dataIndex: 'title' },
+        { title: 'Career', dataIndex: 'career_name', width: 200 },
+        { title: 'Level', dataIndex: 'level', width: 120, render: (v) => <Tag color={v === 1 ? 'green' : v === 2 ? 'blue' : 'purple'}>{PROJECT_LEVELS[v] ?? v}</Tag> },
+        { title: 'Description', dataIndex: 'description', ellipsis: true, render: (v) => v ?? '—' },
+      ]}
+    />
+  );
+}
+
 /** Read-only catalogue for students and parents, next to their own matches. */
 function BrowseCatalogue() {
   const { data, isLoading } = useQuery({ queryKey: ['careers', '', undefined], queryFn: () => careersApi.list() });
@@ -620,7 +677,10 @@ export default function CareersPage() {
         items={[
           { key: 'students', label: 'Student matches', children: <StudentMatches /> },
           { key: 'catalogue', label: 'Career catalogue', children: <CareerCatalogue /> },
-          ...(can('career.create') || can('career.update') ? [{ key: 'courses', label: 'Courses', children: <CoursesMaster /> }] : []),
+          ...(can('career.create') || can('career.update') ? [
+            { key: 'courses', label: 'Courses', children: <CoursesMaster /> },
+            { key: 'project-ideas', label: 'Project Ideas', children: <ProjectIdeasMaster /> },
+          ] : []),
         ]}
       />
     </Card>

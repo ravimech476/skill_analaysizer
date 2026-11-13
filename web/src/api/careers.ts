@@ -79,6 +79,11 @@ export interface Career {
   description: string | null;
   avg_package: number | null;
   min_cgpa: number;
+  holland_code: string | null;
+  key_traits: string[];
+  coding_relevance: number;
+  growth_outlook: number | null;
+  growth_note: string | null;
   course_count: number;
   is_active: boolean;
   skills: CareerSkill[];
@@ -91,6 +96,11 @@ export interface CareerInput {
   description?: string | null;
   avg_package?: number | null;
   min_cgpa: number;
+  holland_code?: string | null;
+  key_traits?: string[];
+  coding_relevance?: number;
+  growth_outlook?: number | null;
+  growth_note?: string | null;
   skills: { skill_id: number; required_level: number; weight: number; is_core: boolean }[];
 }
 

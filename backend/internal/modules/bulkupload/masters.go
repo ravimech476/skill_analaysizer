@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"skills-analyzer/internal/pkg/actor"
+	"skills-analyzer/internal/pkg/response"
 	"skills-analyzer/internal/pkg/upload"
 	"skills-analyzer/internal/pkg/xlsxutil"
 )
@@ -179,7 +180,7 @@ func (h *Handler) importSubjects(ctx context.Context, a actor.Actor, t *upload.T
 			var existingID int64
 			err := tx.QueryRow(ctx, `SELECT id FROM subjects WHERE upper(code) = $1 AND is_active`, code).Scan(&existingID)
 			if err == nil {
-				return fmt.Errorf("subject with code %q already exists, skipping", code)
+				return response.Conflict(fmt.Sprintf("subject with code %q already exists, skipping", code))
 			}
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return err
@@ -252,7 +253,7 @@ func (h *Handler) importCompanies(ctx context.Context, a actor.Actor, t *upload.
 			var existingID int64
 			err := tx.QueryRow(ctx, `SELECT id FROM companies WHERE lower(name) = lower($1) AND is_active`, name).Scan(&existingID)
 			if err == nil {
-				return fmt.Errorf("company %q already exists, skipping", name)
+				return response.Conflict(fmt.Sprintf("company %q already exists, skipping", name))
 			}
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return err
@@ -364,7 +365,7 @@ func (h *Handler) importExamTypes(ctx context.Context, a actor.Actor, t *upload.
 			var existingID int64
 			err := tx.QueryRow(ctx, `SELECT id FROM exam_types WHERE upper(code) = $1 AND is_active`, code).Scan(&existingID)
 			if err == nil {
-				return fmt.Errorf("exam type with code %q already exists, skipping", code)
+				return response.Conflict(fmt.Sprintf("exam type with code %q already exists, skipping", code))
 			}
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return err
@@ -439,7 +440,7 @@ func (h *Handler) importSkillMaster(ctx context.Context, a actor.Actor, t *uploa
 			var existingID int64
 			err := tx.QueryRow(ctx, `SELECT id FROM skills WHERE lower(name) = lower($1) AND is_active`, name).Scan(&existingID)
 			if err == nil {
-				return fmt.Errorf("skill %q already exists, skipping", name)
+				return response.Conflict(fmt.Sprintf("skill %q already exists, skipping", name))
 			}
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return err
@@ -541,7 +542,7 @@ func (h *Handler) importAcademicYears(ctx context.Context, a actor.Actor, t *upl
 			var existingID int64
 			err := tx.QueryRow(ctx, `SELECT id FROM academic_years WHERE lower(name) = lower($1) AND is_active`, name).Scan(&existingID)
 			if err == nil {
-				return fmt.Errorf("academic year %q already exists, skipping", name)
+				return response.Conflict(fmt.Sprintf("academic year %q already exists, skipping", name))
 			}
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return err

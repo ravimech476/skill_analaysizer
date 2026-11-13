@@ -35,7 +35,7 @@ func oneOf(list []string, v string) bool {
 func cell(t *upload.Table, r []string, col string, max int) (string, error) {
 	v := strings.TrimSpace(t.Get(r, col))
 	if len([]rune(v)) > max {
-		return "", fmt.Errorf("%s is longer than %d characters", col, max)
+		return "", response.BadRequest(fmt.Sprintf("%s is longer than %d characters", col, max))
 	}
 	return v, nil
 }

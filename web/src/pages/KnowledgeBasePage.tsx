@@ -113,6 +113,14 @@ export default function KnowledgeBasePage() {
         />
       </Card>
 
+      <Alert
+        type="info"
+        showIcon
+        message="Built-in knowledge"
+        description="The system comes with built-in career paths, industry skills, and domain knowledge. You can supplement this by uploading your own documents above. To edit the built-in content, update the markdown files in backend/internal/modules/kb/knowledge/ and restart the server."
+        style={{ marginBottom: 16 }}
+      />
+
       <Card title="Test search">
         <Typography.Paragraph type="secondary">Ask a question the way a student would, and see which passages the assistant would find.</Typography.Paragraph>
         <Space.Compact style={{ width: '100%', maxWidth: 640 }}>

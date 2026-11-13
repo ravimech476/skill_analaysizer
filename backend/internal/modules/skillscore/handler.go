@@ -3,6 +3,7 @@ package skillscore
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"skills-analyzer/internal/middleware"
+	"skills-analyzer/internal/modules/faculty"
 	"skills-analyzer/internal/modules/student"
 	"skills-analyzer/internal/pkg/actor"
 	"skills-analyzer/internal/pkg/dbutil"
@@ -34,6 +36,9 @@ func Register(r *gin.RouterGroup, db *pgxpool.Pool, perms *rbac.Cache, students 
 
 	r.GET("/config/threshold", can("config.view"), h.getThreshold)
 	r.PUT("/config/threshold", can("config.update"), h.setThreshold)
+
+	r.GET("/config/readiness", can("config.view"), h.getReadiness)
+	r.PUT("/config/readiness", can("config.update"), h.setReadiness)
 
 	r.GET("/students/:id/skill-scores", can("student_skill.view"), h.studentScores)
 	// Anyone who may record a skill may also refresh the scores built from it.
@@ -209,6 +214,85 @@ func (h *Handler) setThreshold(c *gin.Context) {
 		return
 	}
 	h.getThreshold(c)
+}
+
+// getReadiness returns the placement readiness weights and risk thresholds.
+func (h *Handler) getReadiness(c *gin.Context) {
+	w, err := faculty.LoadReadinessWeights(c, h.db)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	rt, err := faculty.LoadRiskThresholds(c, h.db)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, gin.H{"readiness_weights": w, "risk_thresholds": rt})
+}
+
+// setReadiness saves new readiness weights and/or risk thresholds.
+func (h *Handler) setReadiness(c *gin.Context) {
+	var body struct {
+		ReadinessWeights *faculty.ReadinessWeights `json:"readiness_weights"`
+		RiskThresholds   *faculty.RiskThresholds   `json:"risk_thresholds"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, response.BadRequest("Send readiness_weights and/or risk_thresholds", err.Error()))
+		return
+	}
+	if body.ReadinessWeights == nil && body.RiskThresholds == nil {
+		response.Error(c, response.BadRequest("Nothing to change"))
+		return
+	}
+	a := actor.From(c)
+	err := pgx.BeginFunc(c, h.db, func(tx pgx.Tx) error {
+		if body.ReadinessWeights != nil {
+			w := body.ReadinessWeights
+			total := w.CGPA + w.Skills + w.Aptitude + w.Coding + w.Attendance + w.Communication
+			if total < 0.99 || total > 1.01 {
+				return response.BadRequest(fmt.Sprintf("Readiness weights must sum to 1.0 (got %.4f)", total))
+			}
+			for _, v := range []float64{w.CGPA, w.Skills, w.Aptitude, w.Coding, w.Attendance, w.Communication} {
+				if v < 0 || v > 1 {
+					return response.BadRequest("Each weight must be between 0 and 1")
+				}
+			}
+			raw, err := json.Marshal(w)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(c, `INSERT INTO app_config (key, value, updated_by) VALUES ($1, $2, $3)
+				ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = now(), updated_by = $3`,
+				faculty.ConfigReadinessWeights, raw, a.ID); err != nil {
+				return err
+			}
+		}
+		if body.RiskThresholds != nil {
+			rt := body.RiskThresholds
+			if rt.High < 0 || rt.High > 100 || rt.Medium < 0 || rt.Medium > 100 {
+				return response.BadRequest("Risk thresholds must be between 0 and 100")
+			}
+			if rt.High >= rt.Medium {
+				return response.BadRequest("High-risk threshold must be below medium-risk threshold")
+			}
+			raw, err := json.Marshal(rt)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(c, `INSERT INTO app_config (key, value, updated_by) VALUES ($1, $2, $3)
+				ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = now(), updated_by = $3`,
+				faculty.ConfigRiskThresholds, raw, a.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	h.getReadiness(c)
 }
 
 // rebuildAll recomputes scores away from the request, so a weight change or a bulk

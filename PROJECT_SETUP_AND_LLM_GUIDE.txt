@@ -17,7 +17,10 @@ Table of Contents:
   12. Ollama LLM Setup
   13. RAG (Retrieval Augmented Generation) Implementation
   14. Chat Module Implementation
-  15. Troubleshooting
+  15. Knowledge Base
+  16. New AI-Powered Modules
+  17. Database Migrations
+  18. Troubleshooting
 
 ================================================================================
 1. PROJECT OVERVIEW
@@ -31,6 +34,17 @@ Skills Analyzer is a college placement and skills management platform that:
 - Provides interview question bank and study materials
 - Sends notifications to eligible students for placement drives
 - AI Chat Assistant (via Ollama LLM + RAG) for personalized guidance
+- Aptitude testing with timed attempts and automatic scoring
+- Communication and soft-skills assessment (self-report + staff rubric)
+- Psychometric profiling (personality, interests, learning style)
+- Career fit analysis (Holland codes, personality traits, coding relevance)
+- Placement prep plans with project ideas and growth outlook
+- Student insight (overall reading) — AI-generated summary per student
+- Data quality reports for administrators
+- Faculty risk alerts with score history tracking
+- Bloom's taxonomy classification for question bank
+- Skill suggestions from marks (LLM-proposed, staff-approved)
+- Knowledge base with vector embeddings for semantic document search
 
 Three applications:
 - Go Backend API (port 8080)
@@ -63,9 +77,11 @@ Flutter Mobile:
   - Token Storage: flutter_secure_storage
   - File Picking: file_picker, image_picker
 
-LLM (AI Chat):
+LLM (AI Chat + Embeddings):
   - Ollama (local LLM server)
-  - Model: llama3.2 (8B) or phi3 (3.8B)
+  - Chat Model: llama3.2 (8B) — generates answers, insights, Bloom's levels
+  - Embedding Model: nomic-embed-text — converts text to vectors for
+    semantic search in the knowledge base
   - Approach: RAG (Retrieval Augmented Generation)
 
 ================================================================================
@@ -93,6 +109,10 @@ Install these on the server/development machine:
 5. Ollama (for LLM/AI features)
    Download: https://ollama.com/download
    Verify: ollama --version
+
+   IMPORTANT: You need TWO models pulled:
+     ollama pull llama3.2          # Chat / text generation (8B params)
+     ollama pull nomic-embed-text  # Text embeddings for knowledge base search
 
 ================================================================================
 4. DATABASE SETUP (PostgreSQL)
@@ -152,17 +172,27 @@ Step 3: Edit .env with your settings
   COLLEGE_NAME=Your College Name
   FILES_DIR=storage
 
-  # Ollama LLM (for AI Chat)
+  # Ollama LLM (for AI Chat and all AI features)
   OLLAMA_URL=http://localhost:11434
   OLLAMA_MODEL=llama3.2
+  # OLLAMA_TIMEOUT=3m
+  # OLLAMA_EMBED_MODEL=nomic-embed-text
+
+  Environment variables explained:
+
+  OLLAMA_URL           Base URL of the Ollama server (default: http://localhost:11434)
+  OLLAMA_MODEL         Chat/generation model name (default: llama3.2)
+  OLLAMA_TIMEOUT       Max time to wait for a model response (default: 3m)
+  OLLAMA_EMBED_MODEL   Embedding model for knowledge base vectors (default: nomic-embed-text)
 
 Step 4: Run the backend
   go run ./cmd/api
 
   The backend will:
   - Connect to PostgreSQL
-  - Auto-run all migrations (creates tables)
+  - Auto-run all migrations (creates tables, 000001 through 000027)
   - Seed the admin user (if none exists)
+  - Seed built-in knowledge base content in the background
   - Start on http://localhost:8080
 
 Step 5: Verify
@@ -260,21 +290,32 @@ skills-analyzer/
 │   │   ├── middleware/         Auth, RBAC, rate limiting
 │   │   ├── modules/
 │   │   │   ├── analyzer/       Skill analyzer dashboards + readiness + resume
+│   │   │   ├── aptitude/       Aptitude test: question bank, timed attempts, scoring
 │   │   │   ├── auth/           Login, OTP, JWT tokens
+│   │   │   ├── blooms/         Bloom's taxonomy level suggestion (LLM-powered)
 │   │   │   ├── bulkupload/     Excel import for all masters
-│   │   │   ├── career/         Career prediction + matching
+│   │   │   ├── career/         Career prediction + matching + fit analysis
+│   │   │   ├── chat/           AI chat assistant (RAG + Ollama)
 │   │   │   ├── class/          Class management + curriculum
+│   │   │   ├── faculty/        Faculty dashboard: readiness, risk alerts, score history
+│   │   │   ├── insight/        Student insight: AI-generated overall reading per student
+│   │   │   ├── kb/             Knowledge base: document upload, chunking, embeddings
+│   │   │   │   └── knowledge/  Built-in knowledge markdown files (seeded on startup)
 │   │   │   ├── marks/          Mark entry, grading, CGPA, PDF statements
 │   │   │   ├── master/         Config-driven CRUD engine for all masters
+│   │   │   ├── materials/      File attachments for study materials + AI indexing
 │   │   │   ├── media/          Photos, resumes, documents
 │   │   │   ├── notification/   In-app + push notifications
 │   │   │   ├── permission/     Permission catalogue
 │   │   │   ├── placement/      Drives, applications, placements, skill matching
+│   │   │   ├── quality/        Data quality report (missing data, anomalies)
 │   │   │   ├── reports/        Analytics dashboard
 │   │   │   ├── role/           Role CRUD
 │   │   │   ├── skillscore/     Blended skill scores + threshold config
+│   │   │   ├── skillsuggest/   Skill suggestions from marks (LLM proposes, staff approves)
 │   │   │   ├── staff/          Staff management
 │   │   │   ├── student/        Student management + skills in form
+│   │   │   ├── talent/         Psychometric assessments, communication, coding profiles
 │   │   │   └── user/           User management
 │   │   ├── notify/             Push notification service
 │   │   ├── pkg/                Shared utilities
@@ -282,7 +323,7 @@ skills-analyzer/
 │   │   ├── router/             Route registration
 │   │   ├── seed/               Admin seeding
 │   │   └── sms/                SMS providers (MSG91, Twilio, webhook)
-│   ├── migrations/             SQL migration files (000001-000014)
+│   ├── migrations/             SQL migration files (000001-000027)
 │   ├── .env                    Environment config (create from .env.example)
 │   └── .env.example            Template
 │
@@ -317,12 +358,13 @@ skills-analyzer/
 OVERVIEW
   Dashboard                 — Stats overview, module tiles
   Reports                   — Pass %, CGPA distribution, placement trends
+  Data Quality              — Missing data, anomalies, completeness per department
 
 ACADEMICS
   Departments               — CRUD + Import from Excel
   Academic Years            — CRUD + Import
   Classes                   — Class management (dept + year + section)
-  Subjects                  — CRUD + Import
+  Subjects                  — CRUD + Import + AI skill-mapping suggestions
   Exams                     — Exam types with max marks, pass %
   Marks                     — Enter marks, class results, upload from Excel
   Attendance                — Subject-wise attendance tracking
@@ -339,6 +381,32 @@ SKILL ANALYZER
   Placement Readiness       — Combined readiness score (CGPA+skills+aptitude+attendance)
   Career Prediction         — Rule-based career matching with readiness levels
   Learning Path             — Recommended courses per skill gap
+  Skill Suggestions         — LLM-suggested skill levels from marks (staff approve)
+
+ASSESSMENTS & TALENT
+  Aptitude Test             — Timed question bank, auto-scored attempts, summary
+  Communication Review      — Self-report questionnaire + staff rubric rating
+  Personality Assessment    — Psychometric questionnaire (personality traits)
+  Interest Assessment       — Holland code / interest inventory
+  Learning Style            — Preferred learning style questionnaire
+  Coding Profiles           — External platform links (GitHub, LeetCode, etc.)
+  Projects                  — Student project portfolio with staff review
+  Talent Profile            — Combined view of all assessment results
+
+CAREER & PLACEMENT
+  Career Fit                — Holland code + personality + coding relevance matching
+  Growth Outlook            — Career growth potential (1-5 scale with notes)
+  Placement Prep Plan       — Gap analysis + recommended projects per career
+  Career Project Ideas      — Suggested projects to demonstrate career-relevant skills
+
+STUDENT INSIGHT
+  Overall Reading           — AI-generated summary and next steps per student
+                              (uses marks, skills, aptitude, assessments, career data)
+
+FACULTY TOOLS
+  Faculty Readiness View    — All students with readiness scores, risk levels, reasons
+  Risk Alerts               — Automatic notifications for at-risk students (daily)
+  Score History             — Per-student readiness score over time (daily snapshots)
 
 PLACEMENT
   Companies                 — Company directory + Import
@@ -347,8 +415,15 @@ PLACEMENT
 
 RESOURCES
   Interview Bank            — Company-wise interview questions by category
-  Study Materials           — Faculty notes, question papers per subject
+  Interview Documents       — Uploaded interview question papers per company
+  Study Materials           — Faculty notes, question papers per subject (with files)
   Question Bank             — Previous year questions with Bloom's taxonomy
+  Question Bank Documents   — Uploaded question papers per subject
+  Knowledge Base            — Documents uploaded for AI search (see section 15)
+
+AI ASSISTANT
+  Chat                      — AI chat with RAG, conversation history, source citations
+  Bloom's Taxonomy          — LLM suggests Bloom's level when adding questions
 
 SETTINGS
   Users                     — User CRUD
@@ -427,6 +502,9 @@ Bulk Upload:
   /api/v1/bulk-upload/exam-types
   /api/v1/bulk-upload/academic-years
   /api/v1/bulk-upload/placement-drives
+  /api/v1/bulk-upload/interview-questions
+  /api/v1/bulk-upload/study-materials
+  /api/v1/bulk-upload/question-bank
 
 Notifications:
   /api/v1/notifications (inbox, send, read)
@@ -434,6 +512,71 @@ Notifications:
 Files:
   POST /api/v1/files (upload)
   GET  /api/v1/files/:uuid (signed download)
+
+AI Chat:
+  POST   /api/v1/chat              — Send a message, get AI response with sources
+  GET    /api/v1/chat/history      — Get chat history for the logged-in user
+  DELETE /api/v1/chat/history      — Clear chat history
+
+Knowledge Base:
+  POST   /api/v1/kb/documents      — Upload a document (staff, split + embedded)
+  GET    /api/v1/kb/documents      — List all KB documents
+  DELETE /api/v1/kb/documents/:id  — Remove a document
+  POST   /api/v1/kb/search         — Semantic search across KB passages
+
+Bloom's Taxonomy:
+  POST /api/v1/blooms/suggest      — Suggest Bloom's level for a question (LLM)
+  POST /api/v1/blooms/review       — Review existing questions in batch (LLM)
+  POST /api/v1/blooms/apply        — Apply reviewed levels to question bank
+
+Student Insight:
+  GET /api/v1/students/:id/insight  — AI-generated overall reading for a student
+
+Skill Suggestions:
+  GET  /api/v1/students/:id/skill-suggestions           — List suggestions
+  POST /api/v1/students/:id/skill-suggestions/generate   — Generate from marks (LLM)
+  POST /api/v1/skill-suggestions/:id/accept              — Staff accepts a suggestion
+  POST /api/v1/skill-suggestions/:id/dismiss             — Staff dismisses a suggestion
+  POST /api/v1/subjects/:id/skill-mapping/suggest        — Suggest skill mapping for a subject (LLM)
+
+Talent Profile & Assessments:
+  GET  /api/v1/assessments/questionnaires/:kind   — Get questionnaire (personality/interests/learning/communication)
+  POST /api/v1/students/:id/assessments/:kind     — Submit a questionnaire
+  POST /api/v1/students/:id/communication-review  — Staff rates a student's communication
+  GET  /api/v1/students/:id/talent-profile        — Combined assessment + coding + projects view
+
+Coding Profiles:
+  POST   /api/v1/students/:id/coding-profiles     — Add a coding platform
+  PUT    /api/v1/coding-profiles/:id               — Update a platform
+  DELETE /api/v1/coding-profiles/:id               — Remove a platform
+  PUT    /api/v1/coding-profiles/:id/verify        — Staff verifies a platform
+
+Projects:
+  POST   /api/v1/students/:id/projects             — Add a project
+  PUT    /api/v1/projects/:id                       — Update a project
+  DELETE /api/v1/projects/:id                       — Remove a project
+  PUT    /api/v1/projects/:id/review                — Staff reviews a project
+
+Aptitude Test:
+  GET  /api/v1/students/:id/aptitude               — Aptitude summary + history
+  POST /api/v1/students/:id/aptitude/start          — Start a timed attempt
+  POST /api/v1/aptitude/attempts/:id/submit         — Submit answers for scoring
+
+Faculty / Readiness:
+  GET  /api/v1/analyzer/readiness                  — Faculty readiness dashboard (all students)
+  POST /api/v1/analyzer/snapshot                   — Trigger an immediate score snapshot
+  GET  /api/v1/students/:id/score-history          — Readiness score history over time
+
+Data Quality:
+  GET /api/v1/reports/data-quality                 — Data quality report (by department)
+
+Materials (file attachments + AI indexing):
+  PUT  /api/v1/study-materials/:id/file            — Attach a file to a study material
+  POST /api/v1/study-materials/:id/index-for-ai    — Index a study material for the KB
+  PUT  /api/v1/interview-questions/:id/file        — Attach a file to an interview question
+  POST /api/v1/interview-questions/:id/index-for-ai — Index for the KB
+  PUT  /api/v1/question-bank/:id/file              — Attach a file to a question bank entry
+  POST /api/v1/question-bank/:id/index-for-ai      — Index for the KB
 
 ================================================================================
 12. OLLAMA LLM SETUP
@@ -448,11 +591,19 @@ Step 1: Install Ollama
   Linux:   curl -fsSL https://ollama.com/install.sh | sh
   macOS:   Download from https://ollama.com/download/mac
 
-Step 2: Pull a model
+Step 2: Pull BOTH required models
 
-  # Recommended for 8GB+ RAM (good quality, moderate speed)
+  # Chat model — generates answers, insights, Bloom's levels, skill suggestions
   ollama pull llama3.2
 
+  # Embedding model — converts text to vectors for knowledge base search
+  ollama pull nomic-embed-text
+
+  Both models are REQUIRED for the full feature set. Without nomic-embed-text,
+  the knowledge base search will not work (chat still functions using
+  database-only RAG, but without document retrieval).
+
+  Alternative chat models (if hardware is limited):
   # For 4-8GB RAM (faster, smaller)
   ollama pull phi3
 
@@ -466,7 +617,12 @@ Step 3: Test Ollama
 Step 4: Verify API is running
 
   curl http://localhost:11434/api/tags
-  # Should list the models you pulled
+  # Should list both llama3.2 and nomic-embed-text
+
+Step 5: Verify embedding model
+
+  curl http://localhost:11434/api/embeddings -d '{"model":"nomic-embed-text","prompt":"test"}'
+  # Should return a JSON object with an embedding array
 
 Ollama runs on port 11434 by default.
 
@@ -474,6 +630,19 @@ Hardware Requirements:
   Minimum: 8 GB RAM, any CPU (slow but works)
   Recommended: 16 GB RAM, 4+ CPU cores
   Best: 16 GB RAM + NVIDIA GPU (fast responses)
+
+Which features use which model:
+  llama3.2 (chat model):
+    - AI chat assistant answers
+    - Student insight (overall reading) generation
+    - Bloom's taxonomy level suggestion
+    - Skill suggestion from marks
+    - Subject-to-skill mapping suggestions
+
+  nomic-embed-text (embedding model):
+    - Knowledge base document indexing (chunking + vectors)
+    - Semantic search when answering chat questions
+    - Study material / interview / question bank AI indexing
 
 ================================================================================
 13. RAG (Retrieval Augmented Generation) — HOW IT WORKS
@@ -490,18 +659,22 @@ Flow:
      - Finds TCS placement drives → required skills: Aptitude ≥3, Java ≥2
      - Finds student's skills → Aptitude (4★), Communication (3★)
      - Finds recommended courses → "Java Fundamentals on NPTEL"
-  3. Backend builds a prompt:
+  3. Backend searches knowledge base (vector similarity):
+     - Finds relevant KB passages about TCS interview tips, roadmaps
+  4. Backend builds a prompt:
      "You are an educational assistant for [College Name].
       Student: Arun Kumar, CGPA 7.8, CSE department.
       Student skills: Aptitude (4/5), Communication (3/5).
       TCS drive requires: Aptitude ≥3, Java ≥2, Communication ≥3.
       Available courses: Java Fundamentals (NPTEL, free, 40 hrs).
 
+      [Knowledge base passages about TCS placed here]
+
       Student question: What skills do I need for TCS?
 
       Give a personalized, helpful answer."
-  4. Sends to Ollama → gets a natural language response
-  5. Returns to the student in the chat UI
+  5. Sends to Ollama → gets a natural language response
+  6. Returns to the student in the chat UI with source citations
 
 What data gets searched (from YOUR database):
   - Student profile (CGPA, department, skills, marks)
@@ -513,6 +686,8 @@ What data gets searched (from YOUR database):
   - Question bank (previous year questions)
   - Attendance records
   - CO/PO mappings (curriculum alignment)
+  - Knowledge base documents (uploaded syllabi, notes, roadmaps — via embeddings)
+  - Built-in knowledge content (career paths, industry skills, domain knowledge)
 
 No training required. No cloud API costs. Data stays on your server.
 
@@ -520,15 +695,16 @@ No training required. No cloud API costs. Data stays on your server.
 14. CHAT MODULE IMPLEMENTATION
 ================================================================================
 
-The AI Chat module needs to be implemented in 3 layers:
+The AI Chat module is implemented in 3 layers:
 
 --- BACKEND (Go) ---
 
-New module: backend/internal/modules/chat/chat.go
+Module: backend/internal/modules/chat/chat.go
 
 Endpoints:
-  POST /api/v1/chat          — Send a message, get AI response
-  GET  /api/v1/chat/history   — Get chat history for the user
+  POST   /api/v1/chat           — Send a message, get AI response
+  GET    /api/v1/chat/history    — Get chat history for the user
+  DELETE /api/v1/chat/history    — Clear chat history
 
 How it works:
   1. Receive student's question
@@ -539,41 +715,51 @@ How it works:
      - "skills" → fetch student's skills, career matches
      - "marks" → fetch mark history, strengths/weaknesses
      - "prepare" → fetch study materials, courses, question bank
-  5. Build a prompt with:
+  5. Search knowledge base (vector similarity via nomic-embed-text)
+  6. Build a prompt with:
      - System instructions (you are an educational assistant)
      - Student context (profile, CGPA, skills, marks summary)
-     - Retrieved data (relevant to the question)
+     - Retrieved database data (relevant to the question)
+     - Knowledge base passages (semantically matched)
+     - Conversation history (last 6 messages for follow-up context)
      - The question itself
-  6. Call Ollama API:
+  7. Call Ollama API:
      POST http://localhost:11434/api/generate
      Body: { "model": "llama3.2", "prompt": "<built prompt>", "stream": false }
-  7. Return the response to the frontend
+  8. Save the answer with source citations
+  9. Return the response to the frontend with sources
+
+Concurrency: A semaphore limits to 2 simultaneous model calls (local models
+are slow and memory-hungry). Additional requests wait.
 
 --- FRONTEND (React Web) ---
 
-Add a chat widget (floating bubble, bottom-right corner):
+A chat widget (floating bubble, bottom-right corner):
   - Opens a chat panel
   - Shows conversation history
   - Text input + send button
   - Displays AI responses with markdown formatting
   - Shows "typing..." indicator while waiting
+  - Shows source documents cited in each answer
 
 --- FRONTEND (Flutter) ---
 
-Add a chat screen:
+A chat screen:
   - Accessible from the sidebar or a floating button
   - Same chat functionality as web
   - Uses the same POST /api/v1/chat endpoint
 
 --- ENVIRONMENT CONFIG ---
 
-Add to backend/.env:
+Backend .env:
   OLLAMA_URL=http://localhost:11434
   OLLAMA_MODEL=llama3.2
+  # OLLAMA_TIMEOUT=3m
+  # OLLAMA_EMBED_MODEL=nomic-embed-text
 
 --- PROMPT TEMPLATE ---
 
-The system prompt should be:
+The system prompt is:
 
   "You are EduSkill Assistant, an AI educational advisor for [College Name].
    You help students with:
@@ -589,7 +775,278 @@ The system prompt should be:
    Never make up information — only use the data provided."
 
 ================================================================================
-15. TROUBLESHOOTING
+15. KNOWLEDGE BASE
+================================================================================
+
+The knowledge base powers the semantic search behind the AI chat assistant.
+Staff upload documents (syllabi, notes, question papers, roadmaps, placement
+guides), which are split into passages and embedded using nomic-embed-text.
+When a student asks a question, the closest passages are found by cosine
+similarity and included in the prompt.
+
+--- HOW IT WORKS ---
+
+  1. Staff uploads a document via POST /api/v1/kb/documents
+     (or indexes a study material / interview question / question paper for AI)
+  2. The document text is split into passages (chunks)
+  3. Each passage is embedded using nomic-embed-text via Ollama
+  4. Embeddings are stored as real[] arrays in PostgreSQL (no pgvector needed)
+  5. When a student asks a question in chat:
+     a. The question is embedded with the same model
+     b. All passage vectors are compared by cosine similarity
+     c. Passages below a minimum score (0.53) are dropped
+     d. Passages scoring far below the best match are also dropped
+     e. Top passages are included as context in the LLM prompt
+
+--- DOCUMENT TYPES ---
+
+  syllabus, notes, question_paper, placement, resume, roadmap, other
+
+Documents can be scoped to a department (only students in that department see
+them) or left unscoped (everyone sees them).
+
+--- BUILT-IN KNOWLEDGE CONTENT ---
+
+On first startup, the backend seeds built-in knowledge from markdown files in:
+  backend/internal/modules/kb/knowledge/
+
+These files contain curated content that is always available to the AI:
+
+  career-paths.md      — Career roadmaps for common engineering roles
+                         (Software Engineer, Data Scientist, etc.),
+                         what each role does, required skills, typical paths
+  domain-knowledge.md  — Domain-specific knowledge across engineering fields,
+                         core concepts, industry applications
+  industry-skills.md   — Industry skill requirements by sector, what companies
+                         look for, technology trends, certifications
+
+These files are embedded and indexed automatically in the background when the
+server starts. To update them, edit the markdown files and restart the server.
+
+--- AI INDEXING OF EXISTING RESOURCES ---
+
+Study materials, interview questions, and question bank entries that have
+uploaded files can be indexed for the AI knowledge base:
+
+  POST /api/v1/study-materials/:id/index-for-ai
+  POST /api/v1/interview-questions/:id/index-for-ai
+  POST /api/v1/question-bank/:id/index-for-ai
+
+This extracts text from the file, chunks it, embeds it, and stores it in the
+KB so the chat assistant can cite it.
+
+================================================================================
+16. NEW AI-POWERED MODULES
+================================================================================
+
+--- APTITUDE TEST ---
+Module: backend/internal/modules/aptitude/
+Tables: aptitude_questions, aptitude_attempts (migration 000013, 000023)
+
+Students take timed aptitude tests drawn from a question bank. Each attempt is
+auto-scored. The summary endpoint returns best score, average, attempt count
+and per-category breakdown. Used in the readiness score calculation.
+
+Endpoints:
+  GET  /api/v1/students/:id/aptitude          — Summary + history
+  POST /api/v1/students/:id/aptitude/start    — Start a timed attempt
+  POST /api/v1/aptitude/attempts/:id/submit   — Submit and score
+
+--- COMMUNICATION REVIEW ---
+Module: backend/internal/modules/talent/ (reviewCommunication handler)
+Tables: communication_reviews (migration 000023)
+
+Staff rate a student's communication on four criteria (1 to 5) using a rubric.
+Students can also self-report via the communication questionnaire (assessment
+kind = 'communication'). The latest staff review is used for the readiness
+score.
+
+Endpoint: POST /api/v1/students/:id/communication-review
+
+--- PSYCHOMETRIC ASSESSMENTS ---
+Module: backend/internal/modules/talent/
+Tables: student_assessments (migration 000022, 000023)
+
+Three questionnaire types: personality, interests, and learning style.
+The questionnaire content is served from the backend (GET /assessments/
+questionnaires/:kind). Each submission is stored; the latest per kind is
+current, older ones form history.
+
+Used by career fit analysis: personality matches career key_traits, interests
+match the Holland code, and learning style guides resource recommendations.
+
+--- CAREER FIT (Interests, Personality, Coding) ---
+Tables: careers extended (migration 000024)
+
+Careers now carry:
+  holland_code       — 3-letter Holland interest code (e.g. RIA, SEC)
+  key_traits         — Personality traits that fit the role
+  coding_relevance   — 0.0 to 1.0 (how much the role relies on programming)
+  growth_outlook     — 1 to 5 (indicative career growth potential)
+  growth_note        — Free-text note about growth prospects
+
+Career matches now include a "fit" JSON object showing how well the student's
+assessments align with the career's requirements.
+
+--- GROWTH OUTLOOK ---
+Part of career fit (migration 000024). Each career has a growth_outlook score
+(1-5) and a growth_note. Shown in the career cards and placement prep plan.
+
+--- PLACEMENT PREP PLAN ---
+Module: backend/internal/modules/career/
+Tables: career_project_ideas (migration 000026)
+
+A placement prep plan shows:
+  - Skills the student needs to develop for a career
+  - Recommended courses to fill gaps
+  - Project ideas to demonstrate the required skills
+  - Growth outlook for the career
+
+Each career can have project ideas at three levels (beginner, intermediate,
+advanced).
+
+--- STUDENT INSIGHT (Overall Reading) ---
+Module: backend/internal/modules/insight/
+Tables: student_insights (migration 000025)
+
+Generates an AI-powered "overall reading" of a student by gathering facts
+from marks, skills, aptitude scores, assessment results, career matches and
+attendance, then asking the LLM to summarize them into 2-3 sentences and
+up to 3 next steps. A safety check rejects any model output that strays
+beyond the provided facts. Falls back to a plain-text summary if the model
+is unavailable or produces rejected output. Cached per student until their
+underlying data changes (tracked by a facts hash).
+
+Endpoint: GET /api/v1/students/:id/insight
+
+--- DATA QUALITY REPORT ---
+Module: backend/internal/modules/quality/
+No new tables (reads existing data)
+
+Scans the database for data completeness and anomalies:
+  - Students missing marks, skills, CGPA, attendance, contact info
+  - Mismatches and inconsistencies
+  - Per-department breakdown
+
+Available to admin, placement officers, HODs and staff. HODs and staff
+see only their own department.
+
+Endpoint: GET /api/v1/reports/data-quality?department_id=
+
+--- FACULTY RISK ALERTS & SCORE HISTORY ---
+Module: backend/internal/modules/faculty/
+Tables: student_score_history (migration 000027)
+
+The faculty readiness dashboard (GET /analyzer/readiness) returns all students
+with:
+  - Readiness score (composite of CGPA, skills, aptitude, coding, communication, attendance)
+  - Risk level (high, medium, low)
+  - Risk reasons (which components are dragging the score down)
+  - Score change (compared to ~1 month ago)
+
+A daily background loop takes a snapshot of every student's scores. When a
+student newly becomes "high risk", an in-app notification is sent to relevant
+staff. Staff can also trigger an immediate snapshot.
+
+Endpoints:
+  GET  /api/v1/analyzer/readiness          — Faculty readiness dashboard
+  POST /api/v1/analyzer/snapshot           — Trigger immediate snapshot
+  GET  /api/v1/students/:id/score-history  — Score history over time
+
+--- BLOOM'S TAXONOMY ---
+Module: backend/internal/modules/blooms/
+No new tables (updates question_bank.blooms_level)
+
+When staff add questions to the question bank, the LLM suggests the Bloom's
+taxonomy level (Remember, Understand, Apply, Analyze, Evaluate, Create).
+Staff can also review existing questions in batch and apply the suggested
+levels.
+
+Endpoints:
+  POST /api/v1/blooms/suggest  — Classify a single question
+  POST /api/v1/blooms/review   — Review a batch of existing questions
+  POST /api/v1/blooms/apply    — Apply suggested levels to the question bank
+
+--- SKILL SUGGESTIONS FROM MARKS ---
+Module: backend/internal/modules/skillsuggest/
+Tables: skill_suggestions (migration 000019)
+
+Analyzes a student's marks across subjects and proposes skill levels. The
+model also suggests which skills map to which subjects. Nothing changes in
+the student's skills until staff accept each suggestion.
+
+Endpoints:
+  GET  /api/v1/students/:id/skill-suggestions            — List suggestions
+  POST /api/v1/students/:id/skill-suggestions/generate    — Generate from marks
+  POST /api/v1/skill-suggestions/:id/accept               — Accept one
+  POST /api/v1/skill-suggestions/:id/dismiss              — Dismiss one
+  POST /api/v1/subjects/:id/skill-mapping/suggest         — Suggest skill mapping
+
+--- CODING PROFILES & PROJECTS ---
+Module: backend/internal/modules/talent/
+Tables: coding_profiles, student_projects (migration 000022)
+
+Students add links to coding platforms (GitHub, LeetCode, HackerRank, etc.)
+and their projects. Staff can verify platforms and review projects.
+
+Endpoints:
+  POST/PUT/DELETE /api/v1/students/:id/coding-profiles
+  PUT /api/v1/coding-profiles/:id/verify
+  POST/PUT/DELETE /api/v1/students/:id/projects
+  PUT /api/v1/projects/:id/review
+
+================================================================================
+17. DATABASE MIGRATIONS
+================================================================================
+
+All migrations are in backend/migrations/ and run automatically on startup
+when AUTO_MIGRATE=true. The migration runner applies them in order.
+
+  000001_init_schema           — Core tables: users, departments, academic_years,
+                                 subjects, exam_types, skills, student_skills
+  000002_seed_masters_rbac     — Seed default roles, permissions, master config
+  000003_phase2_access         — Classes, staff, bulk upload jobs, RBAC refinements
+  000004_marks                 — Marks, grading rules, CGPA calculation
+  000005_placement             — Companies, job roles, applications, placements
+  000006_notifications         — Notification tables + push tokens
+  000007_lifecycle             — Attendance, CO/PO mapping, course outcomes
+  000008_reports               — Report helper views and aggregations
+  000009_files                 — File upload table (signed URLs)
+  000010_skill_model           — Blended skill score model (declared+assessed+certified+academic)
+  000011_threshold             — Skill analysis config / threshold settings
+  000012_career_reactivate     — Careers table, career matching, learning paths
+  000013_aptitude              — Aptitude question bank + attempts table
+  000014_phase3                — Miscellaneous phase 3 refinements
+
+  --- New migrations (added since the original guide) ---
+
+  000015_chat                  — Chat messages table + chat.use permission
+  000016_sample_knowledge      — Sample interview questions, resume tips, career
+                                 roadmaps, study materials (seeded data)
+  000017_knowledge_base        — kb_documents + kb_chunks tables with embedding
+                                 vectors (real[] arrays, no pgvector needed)
+  000018_chat_sources          — Add sources (jsonb) column to chat_messages for
+                                 citing knowledge base documents in answers
+  000019_skill_suggestions     — skill_suggestions table (LLM-proposed, staff-approved)
+  000020_bulk_and_material_files — Expand bulk upload types (interview questions,
+                                 study materials, question bank); add file column
+                                 to study materials
+  000021_document_banks        — interview_documents + question_bank_documents tables
+                                 (uploaded files per company / subject)
+  000022_talent_profile        — student_assessments (personality, interests, learning),
+                                 coding_profiles, student_projects tables
+  000023_communication_aptitude — Add communication assessment kind; communication_reviews
+                                 table (staff rubric); aptitude enhancements
+  000024_career_fit            — Add holland_code, key_traits, coding_relevance,
+                                 growth_outlook, growth_note to careers; add fit
+                                 jsonb to career_matches
+  000025_student_insights      — student_insights table (cached AI overall reading)
+  000026_career_project_ideas  — career_project_ideas table (projects per career)
+  000027_score_history         — student_score_history table (daily readiness snapshots
+                                 for trend tracking and risk alerts)
+
+================================================================================
+18. TROUBLESHOOTING
 ================================================================================
 
 Problem: "Cannot reach the server" on mobile app
@@ -619,7 +1076,7 @@ Problem: CORS errors in browser
   - Restart the backend
 
 Problem: Ollama not responding
-  - Check: ollama list (should show your model)
+  - Check: ollama list (should show llama3.2 and nomic-embed-text)
   - Check: curl http://localhost:11434/api/tags
   - Restart: ollama serve
 
@@ -627,6 +1084,27 @@ Problem: LLM responses are slow
   - Use a smaller model: ollama pull phi3
   - Add more RAM or a GPU
   - Set a shorter max_tokens in the API call
+
+Problem: Knowledge base search returns no results
+  - Check nomic-embed-text is pulled: ollama list
+  - Check that documents have been uploaded or built-in content was seeded
+  - The server seeds built-in content on startup; check logs for errors
+  - Re-index documents: POST /api/v1/kb/documents (re-upload)
+
+Problem: Student insight says "unavailable"
+  - The insight module needs the chat model (llama3.2) running
+  - If the model is down, insight falls back to plain-text facts
+  - Check Ollama is running and the model is loaded
+
+Problem: Bloom's / skill suggestions not working
+  - These features need the chat model (OLLAMA_MODEL) running
+  - Check OLLAMA_URL and OLLAMA_MODEL in .env
+  - The model must be pulled: ollama pull llama3.2
+
+Problem: Risk alerts not appearing
+  - Risk alerts are generated by a daily background loop
+  - To trigger immediately: POST /api/v1/analyzer/snapshot
+  - Alerts are in-app notifications only (no email or SMS)
 
 ================================================================================
   END OF GUIDE

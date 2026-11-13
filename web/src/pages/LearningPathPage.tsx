@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Alert, Card, Col, Empty, Row, Select, Space, Spin, Table, Tabs, Tag, Typography,
+  Alert, Card, Empty, Select, Space, Spin, Table, Tabs, Tag, Typography,
 } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { careersApi, coursesApi, type CareerMatch, type Course } from '../api/careers';
